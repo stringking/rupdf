@@ -60,6 +60,11 @@ impl<'a> PdfGenerator<'a> {
                     Element::Image(img) => {
                         // Check image type to determine tracking strategy
                         let loaded = self.resources.get_image(&img.image_ref)?;
+                        let (src_w, src_h) = loaded.dimensions();
+                        // Compute final render dimensions
+                        let (final_w, final_h) = Self::compute_image_dimensions(
+                            src_w, src_h, img.w, img.h
+                        );
                         let key = match loaded {
                             LoadedImage::Svg { .. } => {
                                 // SVGs are vector - use original name, size 0x0 as placeholder
@@ -67,11 +72,11 @@ impl<'a> PdfGenerator<'a> {
                             }
                             LoadedImage::Raster { .. } => {
                                 // Raster images get per-size entries for 300 DPI
-                                Self::image_size_key(&img.image_ref, img.w, img.h)
+                                Self::image_size_key(&img.image_ref, final_w, final_h)
                             }
                         };
                         image_usages.entry(key).or_insert_with(|| {
-                            (img.image_ref.clone(), img.w, img.h)
+                            (img.image_ref.clone(), final_w, final_h)
                         });
                     }
                     _ => {}
@@ -432,40 +437,45 @@ impl<'a> PdfGenerator<'a> {
         img: &ImageElement,
         page_height: f32,
     ) -> Result<()> {
-        // Convert to PDF coordinates
-        let pdf_y = page_height - img.y - img.h;
-
         // Save graphics state
         content.save_state();
 
-        // Get the loaded image to determine scaling
+        // Get the loaded image to determine source dimensions
         let loaded = self.resources.get_image(&img.image_ref)?;
+        let (src_w, src_h) = loaded.dimensions();
 
-        // Transform depends on image type:
-        // - Raster images use unit coordinates (0-1), scale by target size
-        // - SVG Form XObjects use native BBox coordinates, scale uniformly to fit
+        // Compute final render dimensions
+        let (final_w, final_h) = Self::compute_image_dimensions(src_w, src_h, img.w, img.h);
+
+        // Apply alignment offset
+        // - left: x is left edge (no offset)
+        // - center: x is center, offset by -w/2
+        // - right: x is right edge, offset by -w
+        let x_offset = match img.align {
+            TextAlign::Left => 0.0,
+            TextAlign::Center => -final_w / 2.0,
+            TextAlign::Right => -final_w,
+        };
+        let render_x = img.x + x_offset;
+
+        // Convert to PDF coordinates (y is top edge, PDF uses bottom-left origin)
+        let pdf_y = page_height - img.y - final_h;
+
+        // Transform and draw - both SVG and raster use same positioning logic
         let xobject_name = match loaded {
             LoadedImage::Svg { width, height, .. } => {
-                // Scale uniformly to fit within target bounds (preserve aspect ratio)
-                let scale_x = img.w / width;
-                let scale_y = img.h / height;
-                let scale = scale_x.min(scale_y); // Use smaller scale to fit
-
-                // Center the SVG within the target bounds
-                let actual_w = width * scale;
-                let actual_h = height * scale;
-                let offset_x = (img.w - actual_w) / 2.0;
-                let offset_y = (img.h - actual_h) / 2.0;
-
-                content.transform([scale, 0.0, 0.0, scale, img.x + offset_x, pdf_y + offset_y]);
+                // SVG Form XObjects use native BBox coordinates, scale to target size
+                let scale_x = final_w / width;
+                let scale_y = final_h / height;
+                content.transform([scale_x, 0.0, 0.0, scale_y, render_x, pdf_y]);
                 // SVGs use original name (vector, no per-size variants)
                 img.image_ref.clone()
             }
             LoadedImage::Raster { .. } => {
-                // Raster images are in unit coordinates, scale by target size
-                content.transform([img.w, 0.0, 0.0, img.h, img.x, pdf_y]);
+                // Raster images are in unit coordinates (0-1), scale by target size
+                content.transform([final_w, 0.0, 0.0, final_h, render_x, pdf_y]);
                 // Raster images use size-specific key (each size embedded at 300 DPI)
-                Self::image_size_key(&img.image_ref, img.w, img.h)
+                Self::image_size_key(&img.image_ref, final_w, final_h)
             }
         };
 
@@ -654,8 +664,8 @@ impl<'a> PdfGenerator<'a> {
             RupdfError::InvalidImage(name.to_string(), format!("Failed to decode: {}", e))
         })?;
 
-        // Convert to RGB (flatten alpha against white)
-        let rgb = img.to_rgb8();
+        // Convert to RGB, flattening alpha against white background
+        let rgb = Self::flatten_alpha_to_white(&img);
         let src_width = rgb.width();
         let src_height = rgb.height();
 
@@ -707,10 +717,49 @@ impl<'a> PdfGenerator<'a> {
         Ok(())
     }
 
+    /// Compute final image dimensions from source size and optional target size
+    /// - If both w and h provided: use exact dimensions (may stretch)
+    /// - If only w provided: scale height to preserve aspect ratio
+    /// - If only h provided: scale width to preserve aspect ratio
+    /// - If neither provided: use source dimensions
+    fn compute_image_dimensions(src_w: f32, src_h: f32, w: Option<f32>, h: Option<f32>) -> (f32, f32) {
+        match (w, h) {
+            (Some(w), Some(h)) => (w, h),
+            (Some(w), None) => {
+                let aspect = src_h / src_w;
+                (w, w * aspect)
+            }
+            (None, Some(h)) => {
+                let aspect = src_w / src_h;
+                (h * aspect, h)
+            }
+            (None, None) => (src_w, src_h),
+        }
+    }
+
     /// Generate a unique key for an image at a specific display size
     /// Used to embed raster images at exactly 300 DPI for each usage
     fn image_size_key(image_ref: &str, w: f32, h: f32) -> String {
         // Round to avoid floating point comparison issues
         format!("{}_{:.0}x{:.0}", image_ref, w, h)
+    }
+
+    /// Flatten alpha channel against white background
+    /// This properly composites transparent pixels instead of just discarding alpha
+    fn flatten_alpha_to_white(img: &image::DynamicImage) -> image::RgbImage {
+        let rgba = img.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        let mut rgb = image::RgbImage::new(width, height);
+
+        for (x, y, pixel) in rgba.enumerate_pixels() {
+            let alpha = pixel[3] as f32 / 255.0;
+            // Composite: result = foreground * alpha + background * (1 - alpha)
+            // With white background (255, 255, 255)
+            let r = (pixel[0] as f32 * alpha + 255.0 * (1.0 - alpha)) as u8;
+            let g = (pixel[1] as f32 * alpha + 255.0 * (1.0 - alpha)) as u8;
+            let b = (pixel[2] as f32 * alpha + 255.0 * (1.0 - alpha)) as u8;
+            rgb.put_pixel(x, y, image::Rgb([r, g, b]));
+        }
+        rgb
     }
 }

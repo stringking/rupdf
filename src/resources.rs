@@ -159,6 +159,16 @@ impl LoadedImage {
         let trimmed = s.trim_start();
         trimmed.starts_with("<?xml") || trimmed.starts_with("<svg") || trimmed.starts_with("<!DOCTYPE svg")
     }
+
+    /// Get the source dimensions of the image in points
+    /// For SVGs, returns the viewBox/size dimensions
+    /// For raster images, returns pixel dimensions (1 pixel = 1 point at 72 DPI)
+    pub fn dimensions(&self) -> (f32, f32) {
+        match self {
+            LoadedImage::Svg { width, height, .. } => (*width, *height),
+            LoadedImage::Raster { width, height, .. } => (*width as f32, *height as f32),
+        }
+    }
 }
 
 /// All loaded resources for rendering

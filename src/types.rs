@@ -118,9 +118,10 @@ pub struct LineElement {
 pub struct ImageElement {
     pub x: f32,
     pub y: f32,
-    pub w: f32,
-    pub h: f32,
+    pub w: Option<f32>,  // If only w provided, scale preserving aspect ratio
+    pub h: Option<f32>,  // If only h provided, scale preserving aspect ratio
     pub image_ref: String,
+    pub align: TextAlign,  // Horizontal alignment: left (default), center, right
 }
 
 /// Barcode element (Code 128)
@@ -300,13 +301,22 @@ impl Element {
                 color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
             })),
 
-            "image" => Ok(Element::Image(ImageElement {
-                x: with_element_context(req(dict, "x"), index)?,
-                y: with_element_context(req(dict, "y"), index)?,
-                w: with_element_context(req(dict, "w"), index)?,
-                h: with_element_context(req(dict, "h"), index)?,
-                image_ref: with_element_context(req(dict, "image_ref"), index)?,
-            })),
+            "image" => {
+                let align_str: String = with_element_context(opt_or(dict, "align", "left".to_string()), index)?;
+                let align = match align_str.as_str() {
+                    "center" => TextAlign::Center,
+                    "right" => TextAlign::Right,
+                    _ => TextAlign::Left,
+                };
+                Ok(Element::Image(ImageElement {
+                    x: with_element_context(req(dict, "x"), index)?,
+                    y: with_element_context(req(dict, "y"), index)?,
+                    w: with_element_context(opt(dict, "w"), index)?,
+                    h: with_element_context(opt(dict, "h"), index)?,
+                    image_ref: with_element_context(req(dict, "image_ref"), index)?,
+                    align,
+                }))
+            }
 
             "barcode" | "barcode128" => Ok(Element::Barcode(BarcodeElement {
                 x: with_element_context(req(dict, "x"), index)?,
