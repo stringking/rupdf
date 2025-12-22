@@ -321,10 +321,16 @@ impl<'a> PdfGenerator<'a> {
         let ps_name = alias_to_ps.get(&text.font)
             .expect("font alias was collected in first pass");
 
-        // Calculate text position
-        // y is top of bounding box, we need baseline
-        let ascender_pts = font.ascender_pts(text.size);
-        let baseline_y = page_height - text.y - ascender_pts;
+        // Calculate baseline position based on vertical anchor
+        // - baseline: y is the text baseline
+        // - cap_top: y is the top of capital letters
+        // - center: y is the midpoint between baseline and cap_top
+        let cap_height_pts = font.cap_height_pts(text.size);
+        let baseline_y = match text.vertical_anchor {
+            VerticalAnchor::Baseline => page_height - text.y,
+            VerticalAnchor::CapTop => page_height - text.y - cap_height_pts,
+            VerticalAnchor::Center => page_height - text.y - cap_height_pts / 2.0,
+        };
 
         // Calculate x based on alignment
         let text_width = font.text_width(&text.text, text.size, &text.font)?;

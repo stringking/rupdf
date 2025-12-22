@@ -131,6 +131,86 @@ def main():
         "stroke": 1, "color": (0, 0, 255, 255)
     })
 
+    # === VERTICAL ANCHOR TEST ===
+    # Test all three vertical anchor modes at y=260
+    anchor_y = 260
+    font_size = 18
+
+    # Horizontal reference line at y=260
+    elements.append({
+        "type": "line",
+        "x1": 40, "y1": anchor_y, "x2": 280, "y2": anchor_y,
+        "stroke": 2, "color": (255, 0, 0, 255)
+    })
+    elements.append({
+        "type": "text",
+        "x": 45, "y": anchor_y - 15,
+        "text": "y = 260 (red line)",
+        "font": "helvetica", "size": 10,
+        "color": (255, 0, 0, 255)
+    })
+
+    # baseline anchor (default) - baseline sits on the line
+    elements.append({
+        "type": "text",
+        "x": 50, "y": anchor_y,
+        "text": "Baseline",
+        "font": "helvetica", "size": font_size,
+        "vertical_anchor": "baseline"
+    })
+
+    # cap_top anchor - top of caps sits on the line
+    elements.append({
+        "type": "text",
+        "x": 140, "y": anchor_y,
+        "text": "CapTop",
+        "font": "helvetica", "size": font_size,
+        "vertical_anchor": "cap_top"
+    })
+
+    # center anchor - vertical center sits on the line
+    elements.append({
+        "type": "text",
+        "x": 220, "y": anchor_y,
+        "text": "Center",
+        "font": "helvetica", "size": font_size,
+        "vertical_anchor": "center"
+    })
+
+    # === COMBINED ALIGNMENT TEST ===
+    # Test horizontal + vertical alignment at (450, 320)
+    combo_x, combo_y = 450, 320
+
+    # Crosshair at anchor point
+    elements.append({
+        "type": "line",
+        "x1": combo_x - 30, "y1": combo_y, "x2": combo_x + 30, "y2": combo_y,
+        "stroke": 1, "color": (255, 0, 0, 255)
+    })
+    elements.append({
+        "type": "line",
+        "x1": combo_x, "y1": combo_y - 30, "x2": combo_x, "y2": combo_y + 30,
+        "stroke": 1, "color": (255, 0, 0, 255)
+    })
+    elements.append({
+        "type": "text",
+        "x": combo_x + 5, "y": combo_y - 35,
+        "text": f"({combo_x}, {combo_y})",
+        "font": "helvetica", "size": 9,
+        "color": (255, 0, 0, 255)
+    })
+
+    # Center-aligned text at the crosshair
+    elements.append({
+        "type": "text",
+        "x": combo_x, "y": combo_y,
+        "text": "CENTER",
+        "font": "helvetica", "size": 16,
+        "align": "center",
+        "vertical_anchor": "center",
+        "color": (0, 100, 200, 255)
+    })
+
     # === RECTANGLE POSITIONING TEST ===
     # Rectangle at (100, 450) with size 100x50
     elements.append({

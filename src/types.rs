@@ -78,6 +78,30 @@ impl<'source> FromPyObject<'source> for TextAlign {
     }
 }
 
+/// Vertical anchor for text positioning
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum VerticalAnchor {
+    #[default]
+    Baseline,  // y is the text baseline
+    CapTop,    // y is the top of capital letters (cap height)
+    Center,    // y is the midpoint between baseline and cap_top
+}
+
+impl<'source> FromPyObject<'source> for VerticalAnchor {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        let s: String = ob.extract()?;
+        match s.as_str() {
+            "baseline" => Ok(VerticalAnchor::Baseline),
+            "cap_top" => Ok(VerticalAnchor::CapTop),
+            "center" => Ok(VerticalAnchor::Center),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid vertical_anchor: '{}'. Must be 'baseline', 'cap_top', or 'center'",
+                s
+            ))),
+        }
+    }
+}
+
 /// Text element
 #[derive(Debug, Clone)]
 pub struct TextElement {
@@ -88,6 +112,7 @@ pub struct TextElement {
     pub size: f32,
     pub color: Color,
     pub align: TextAlign,
+    pub vertical_anchor: VerticalAnchor,
 }
 
 /// Rectangle element
@@ -280,6 +305,7 @@ impl Element {
                 size: with_element_context(req(dict, "size"), index)?,
                 color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
                 align: with_element_context(opt_default(dict, "align"), index)?,
+                vertical_anchor: with_element_context(opt_default(dict, "vertical_anchor"), index)?,
             })),
 
             "rect" => Ok(Element::Rect(RectElement {

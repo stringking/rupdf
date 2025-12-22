@@ -10,6 +10,7 @@ pub struct LoadedFont {
     pub units_per_em: u16,
     pub ascender: i16,
     pub descender: i16,
+    pub cap_height: i16,                   // Height of capital letters
     pub glyph_widths: HashMap<u16, u16>, // glyph_id -> advance width
     pub cmap: HashMap<char, u16>,         // char -> glyph_id
 }
@@ -30,6 +31,17 @@ impl LoadedFont {
         let units_per_em = face.units_per_em();
         let ascender = face.ascender();
         let descender = face.descender();
+
+        // Get cap height from OS/2 table, or estimate from 'H' glyph, or fallback to 70% of ascender
+        let cap_height = face.capital_height()
+            .map(|h| h as i16)
+            .or_else(|| {
+                // Try to get height of 'H' glyph
+                face.glyph_index('H')
+                    .and_then(|gid| face.glyph_bounding_box(gid))
+                    .map(|bbox| bbox.y_max)
+            })
+            .unwrap_or_else(|| (ascender as f32 * 0.7) as i16);
 
         // Extract PostScript name from name table (name_id 6)
         let postscript_name = face
@@ -70,6 +82,7 @@ impl LoadedFont {
             units_per_em,
             ascender,
             descender,
+            cap_height,
             glyph_widths,
             cmap,
         })
@@ -102,6 +115,11 @@ impl LoadedFont {
     /// Get ascender in points for given font size
     pub fn ascender_pts(&self, size: f32) -> f32 {
         self.ascender as f32 * size / self.units_per_em as f32
+    }
+
+    /// Get cap height in points for given font size
+    pub fn cap_height_pts(&self, size: f32) -> f32 {
+        self.cap_height as f32 * size / self.units_per_em as f32
     }
 }
 
