@@ -241,6 +241,8 @@ impl<'a> PdfGenerator<'a> {
 
         // Draw background if not white
         if page.background.r != 255 || page.background.g != 255 || page.background.b != 255 || page.background.a != 255 {
+            content.save_state();
+
             let (r, g, b) = page.background.to_rgb_floats();
 
             // Set alpha if needed
@@ -252,6 +254,8 @@ impl<'a> PdfGenerator<'a> {
             content.set_fill_rgb(r, g, b);
             content.rect(0.0, 0.0, page.width, page.height);
             content.fill_nonzero();
+
+            content.restore_state();
         }
 
         // Render elements
@@ -325,6 +329,9 @@ impl<'a> PdfGenerator<'a> {
             TextAlign::Right => text.x - text_width,
         };
 
+        // Save state to isolate graphics state changes
+        content.save_state();
+
         // Set alpha if needed
         if text.color.a != 255 {
             let alpha_name = self.get_alpha_state_name(text.color.a, alpha_states);
@@ -344,6 +351,8 @@ impl<'a> PdfGenerator<'a> {
         content.show(Str(&encoded));
         content.end_text();
 
+        content.restore_state();
+
         Ok(())
     }
 
@@ -354,6 +363,9 @@ impl<'a> PdfGenerator<'a> {
         page_height: f32,
         alpha_states: &HashMap<u8, Ref>,
     ) {
+        // Save state to isolate graphics state changes
+        content.save_state();
+
         // Convert to PDF coordinates (bottom-left origin)
         let pdf_y = page_height - rect.y - rect.h;
 
@@ -381,6 +393,8 @@ impl<'a> PdfGenerator<'a> {
             content.rect(rect.x, pdf_y, rect.w, rect.h);
             content.stroke();
         }
+
+        content.restore_state();
     }
 
     fn render_line(
@@ -390,6 +404,9 @@ impl<'a> PdfGenerator<'a> {
         page_height: f32,
         alpha_states: &HashMap<u8, Ref>,
     ) {
+        // Save state to isolate graphics state changes
+        content.save_state();
+
         // Convert to PDF coordinates
         let pdf_y1 = page_height - line.y1;
         let pdf_y2 = page_height - line.y2;
@@ -405,6 +422,8 @@ impl<'a> PdfGenerator<'a> {
         content.move_to(line.x1, pdf_y1);
         content.line_to(line.x2, pdf_y2);
         content.stroke();
+
+        content.restore_state();
     }
 
     fn render_image(
@@ -470,6 +489,9 @@ impl<'a> PdfGenerator<'a> {
     ) -> Result<()> {
         use barcoders::sym::code128::Code128;
 
+        // Save state to isolate graphics state changes
+        content.save_state();
+
         // Code128 requires a character-set prefix:
         // \u{00C0} (À) = character-set A (uppercase, control chars)
         // \u{0181} (Ɓ) = character-set B (upper/lowercase, punctuation)
@@ -534,6 +556,8 @@ impl<'a> PdfGenerator<'a> {
             content.end_text();
         }
 
+        content.restore_state();
+
         Ok(())
     }
 
@@ -545,6 +569,9 @@ impl<'a> PdfGenerator<'a> {
         alpha_states: &HashMap<u8, Ref>,
     ) -> Result<()> {
         use qrcode::QrCode;
+
+        // Save state to isolate graphics state changes
+        content.save_state();
 
         // Generate QR code
         let code = QrCode::new(qr.value.as_bytes()).map_err(|e| RupdfError::InvalidBarcode {
@@ -563,6 +590,7 @@ impl<'a> PdfGenerator<'a> {
         let qr_width = if qr_height > 0 { lines[0].chars().count() } else { 0 };
 
         if qr_width == 0 || qr_height == 0 {
+            content.restore_state();
             return Ok(());
         }
 
@@ -603,6 +631,8 @@ impl<'a> PdfGenerator<'a> {
             }
         }
         content.fill_nonzero();
+
+        content.restore_state();
 
         Ok(())
     }

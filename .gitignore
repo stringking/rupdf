@@ -40,6 +40,9 @@ python/tests/*.pdf
 benchmarks/*.pdf
 benchmarks/*.json
 
+# Test assets directory (not versioned - provide your own images via CLI args)
+tests/
+
 # Benchmark outputs
 benchmarks/results/
 *.bench.json

@@ -212,6 +212,10 @@ maturin develop
 cargo test                    # Rust unit tests
 pytest python/tests/ -v       # Python tests
 
+# Generate test PDF with all element types
+python scripts/generate_test_pdf.py                          # Without images
+python scripts/generate_test_pdf.py --svg logo.svg --png photo.png  # With images
+
 # Benchmarks
 python benchmarks/run_benchmark.py
 ```
