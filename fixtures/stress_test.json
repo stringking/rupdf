@@ -1,0 +1,642 @@
+{
+  "metadata": {
+    "title": "Stress Test Document",
+    "creator": "rupdf benchmark"
+  },
+  "pages": [
+    {
+      "background": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 50.0,
+          "text": "Stress Test Page 1",
+          "font": "default",
+          "size": 18.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 80.0,
+          "text": "Line 1: The quick brown fox jumps over the lazy dog.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 95.0,
+          "text": "Line 2: Pack my box with five dozen liquor jugs.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 110.0,
+          "text": "Line 3: How vexingly quick daft zebras jump!",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 125.0,
+          "text": "Line 4: The five boxing wizards jump quickly.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 140.0,
+          "text": "Line 5: Jackdaws love my big sphinx of quartz.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 155.0,
+          "text": "Line 6: The quick brown fox jumps over the lazy dog.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 170.0,
+          "text": "Line 7: Pack my box with five dozen liquor jugs.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 185.0,
+          "text": "Line 8: How vexingly quick daft zebras jump!",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 200.0,
+          "text": "Line 9: The five boxing wizards jump quickly.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 215.0,
+          "text": "Line 10: Jackdaws love my big sphinx of quartz.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "rect",
+          "x": 72.0,
+          "y": 240.0,
+          "w": 100.0,
+          "h": 30.0,
+          "stroke": 1.0,
+          "stroke_color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "fill_color": [
+            240,
+            240,
+            240,
+            255
+          ]
+        },
+        {
+          "type": "rect",
+          "x": 182.0,
+          "y": 240.0,
+          "w": 100.0,
+          "h": 30.0,
+          "stroke": 1.0,
+          "stroke_color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "fill_color": [
+            230,
+            240,
+            250,
+            255
+          ]
+        },
+        {
+          "type": "rect",
+          "x": 292.0,
+          "y": 240.0,
+          "w": 100.0,
+          "h": 30.0,
+          "stroke": 1.0,
+          "stroke_color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "fill_color": [
+            250,
+            240,
+            230,
+            255
+          ]
+        },
+        {
+          "type": "rect",
+          "x": 402.0,
+          "y": 240.0,
+          "w": 100.0,
+          "h": 30.0,
+          "stroke": 1.0,
+          "stroke_color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "fill_color": [
+            240,
+            250,
+            240,
+            255
+          ]
+        },
+        {
+          "type": "line",
+          "x1": 72.0,
+          "y1": 290.0,
+          "x2": 540.0,
+          "y2": 290.0,
+          "stroke": 1.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "line",
+          "x1": 72.0,
+          "y1": 300.0,
+          "x2": 540.0,
+          "y2": 300.0,
+          "stroke": 0.5,
+          "color": [
+            150,
+            150,
+            150,
+            255
+          ]
+        },
+        {
+          "type": "line",
+          "x1": 72.0,
+          "y1": 310.0,
+          "x2": 540.0,
+          "y2": 310.0,
+          "stroke": 0.5,
+          "color": [
+            150,
+            150,
+            150,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 340.0,
+          "text": "Table Row 1: Data A | Data B | Data C | Data D",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 355.0,
+          "text": "Table Row 2: Data E | Data F | Data G | Data H",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 370.0,
+          "text": "Table Row 3: Data I | Data J | Data K | Data L",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 385.0,
+          "text": "Table Row 4: Data M | Data N | Data O | Data P",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 400.0,
+          "text": "Table Row 5: Data Q | Data R | Data S | Data T",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "barcode",
+          "x": 72.0,
+          "y": 430.0,
+          "w": 150.0,
+          "h": 50.0,
+          "value": "BENCH001",
+          "human_readable": true,
+          "font": "default",
+          "font_size": 8.0
+        },
+        {
+          "type": "barcode",
+          "x": 250.0,
+          "y": 430.0,
+          "w": 150.0,
+          "h": 50.0,
+          "value": "BENCH002",
+          "human_readable": true,
+          "font": "default",
+          "font_size": 8.0
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 520.0,
+          "text": "Additional text block with multiple lines of content.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 535.0,
+          "text": "This simulates a typical document with mixed content.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 550.0,
+          "text": "Performance testing requires representative workloads.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "rect",
+          "x": 72.0,
+          "y": 580.0,
+          "w": 468.0,
+          "h": 150.0,
+          "stroke": 2.0,
+          "stroke_color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 306.0,
+          "y": 650.0,
+          "text": "Large Content Area",
+          "font": "default",
+          "size": 16.0,
+          "color": [
+            100,
+            100,
+            100,
+            255
+          ],
+          "align": "center"
+        }
+      ],
+      "size": [
+        612.0,
+        792.0
+      ]
+    },
+    {
+      "background": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 50.0,
+          "text": "Stress Test Page 2",
+          "font": "default",
+          "size": 18.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 80.0,
+          "text": "More content on the second page.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 95.0,
+          "text": "Testing multi-page document generation.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 110.0,
+          "text": "Line 3 of page 2 content.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 125.0,
+          "text": "Line 4 of page 2 content.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 140.0,
+          "text": "Line 5 of page 2 content.",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "rect",
+          "x": 72.0,
+          "y": 160.0,
+          "w": 200.0,
+          "h": 100.0,
+          "stroke": 1.0,
+          "stroke_color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "fill_color": [
+            245,
+            245,
+            245,
+            255
+          ]
+        },
+        {
+          "type": "rect",
+          "x": 300.0,
+          "y": 160.0,
+          "w": 200.0,
+          "h": 100.0,
+          "stroke": 1.0,
+          "stroke_color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "fill_color": [
+            245,
+            250,
+            255,
+            255
+          ]
+        },
+        {
+          "type": "line",
+          "x1": 72.0,
+          "y1": 280.0,
+          "x2": 540.0,
+          "y2": 280.0,
+          "stroke": 1.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "barcode",
+          "x": 72.0,
+          "y": 300.0,
+          "w": 180.0,
+          "h": 60.0,
+          "value": "PAGE2-001",
+          "human_readable": true,
+          "font": "default",
+          "font_size": 9.0
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 400.0,
+          "text": "Footer section of page 2",
+          "font": "default",
+          "size": 10.0,
+          "color": [
+            100,
+            100,
+            100,
+            255
+          ]
+        }
+      ],
+      "size": [
+        612.0,
+        792.0
+      ]
+    }
+  ],
+  "resources": {
+    "fonts": {},
+    "images": {}
+  }
+}

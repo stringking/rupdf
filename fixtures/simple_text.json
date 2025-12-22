@@ -1,0 +1,84 @@
+{
+  "metadata": {
+    "title": "Simple Text Test",
+    "creator": "rupdf"
+  },
+  "pages": [
+    {
+      "background": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 72.0,
+          "text": "Hello, World!",
+          "font": "default",
+          "size": 24.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 72.0,
+          "y": 120.0,
+          "text": "This is a simple text document.",
+          "font": "default",
+          "size": 12.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ]
+        },
+        {
+          "type": "text",
+          "x": 306.0,
+          "y": 200.0,
+          "text": "Centered Text",
+          "font": "default",
+          "size": 16.0,
+          "color": [
+            100,
+            100,
+            100,
+            255
+          ],
+          "align": "center"
+        },
+        {
+          "type": "text",
+          "x": 540.0,
+          "y": 250.0,
+          "text": "Right Aligned",
+          "font": "default",
+          "size": 14.0,
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "align": "right"
+        }
+      ],
+      "size": [
+        612.0,
+        792.0
+      ]
+    }
+  ],
+  "resources": {
+    "fonts": {},
+    "images": {}
+  }
+}

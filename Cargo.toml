@@ -1,0 +1,33 @@
+[package]
+name = "rupdf"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A fast, minimal PDF page renderer"
+
+[lib]
+name = "rupdf"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.19", features = ["extension-module"] }
+pdf-writer = "0.9"
+miniz_oxide = "0.6"
+image = { version = "0.24", default-features = false, features = ["jpeg", "png", "webp"] }
+resvg = "0.29"
+usvg = "0.29"
+tiny-skia = "0.8"
+ttf-parser = "0.18"
+subsetter = "0.1"
+barcoders = "2.0"
+qrcode = "0.13"
+thiserror = "1.0"
+
+# Note: Criterion benchmarks require Rust 1.74+
+# For older Rust versions, use the Python benchmarks in benchmarks/
+# [dev-dependencies]
+# criterion = "0.5"
+#
+# [[bench]]
+# name = "render"
+# harness = false
