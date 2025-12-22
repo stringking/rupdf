@@ -232,6 +232,37 @@ def main():
         "fill_color": (255, 0, 0, 255)
     })
 
+    # === ROUNDED RECTANGLE TEST ===
+    # Rounded rect at (100, 520) with size 100x50, corner_radius=10
+    elements.append({
+        "type": "rect",
+        "x": 100, "y": 520, "w": 100, "h": 50,
+        "fill_color": (255, 200, 100, 200),
+        "stroke": 2, "stroke_color": (200, 100, 0, 255),
+        "corner_radius": 10
+    })
+    elements.append({
+        "type": "text",
+        "x": 100, "y": 510,
+        "text": "rounded rect r=10",
+        "font": "helvetica", "size": 10
+    })
+
+    # Pill-shaped rect (radius = half height)
+    elements.append({
+        "type": "rect",
+        "x": 220, "y": 520, "w": 80, "h": 30,
+        "fill_color": (100, 200, 100, 200),
+        "stroke": 1, "stroke_color": (0, 150, 0, 255),
+        "corner_radius": 15
+    })
+    elements.append({
+        "type": "text",
+        "x": 220, "y": 510,
+        "text": "pill r=15 (h=30)",
+        "font": "helvetica", "size": 10
+    })
+
     # === LINE POSITIONING TEST ===
     # Line from (300, 450) to (400, 520)
     elements.append({

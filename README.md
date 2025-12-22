@@ -4,11 +4,11 @@ A fast, minimal PDF renderer in Rust with Python bindings. Takes pre-laid-out pa
 
 ## Features
 
-- **Text** with TTF/OTF fonts, alignment, and colors
-- **Rectangles** with stroke and fill
+- **Text** with TTF/OTF fonts, horizontal/vertical alignment, and colors
+- **Rectangles** with stroke, fill, and rounded corners
 - **Lines** with configurable width
 - **Images** (PNG, JPEG, WebP, SVG)
-- **Barcodes** (Code 128, with optional human-readable text)
+- **Barcodes** (Code 128) and **QR codes**
 - **Font subsetting** - embeds only used glyphs
 - **Compression** - optional zlib compression
 
@@ -95,12 +95,24 @@ Common page sizes:
     "x": 72,
     "y": 72,
     "text": "Hello",
-    "font": "font_ref",      # Reference to fonts in resources
-    "size": 12,              # Font size in points
-    "color": (0, 0, 0, 255), # RGBA
-    "align": "left"          # "left", "center", or "right"
+    "font": "font_ref",           # Reference to fonts in resources
+    "size": 12,                   # Font size in points
+    "color": (0, 0, 0, 255),      # RGBA (optional, default black)
+    "align": "left",              # "left", "center", or "right" (optional)
+    "vertical_anchor": "baseline" # "baseline", "cap_top", or "center" (optional)
 }
 ```
+
+**Positioning:**
+- `(x, y)` specifies the anchor point of the text
+- `align` controls horizontal alignment relative to x:
+  - `"left"` (default): text extends to the right of x
+  - `"center"`: text is centered on x
+  - `"right"`: text extends to the left of x
+- `vertical_anchor` controls vertical alignment relative to y:
+  - `"baseline"` (default): y is the text baseline
+  - `"cap_top"`: y is the top of capital letters
+  - `"center"`: y is the vertical center of capital letters
 
 ### Rectangle
 
@@ -111,11 +123,16 @@ Common page sizes:
     "y": 72,
     "w": 100,
     "h": 50,
-    "stroke": 1.0,                    # Stroke width (0 for no stroke)
-    "stroke_color": (0, 0, 0, 255),   # Optional
-    "fill_color": (255, 255, 255, 255) # Optional
+    "stroke": 1.0,                     # Stroke width (0 for no stroke)
+    "stroke_color": (0, 0, 0, 255),    # Optional
+    "fill_color": (255, 255, 255, 255), # Optional
+    "corner_radius": 10                # Optional, for rounded corners
 }
 ```
+
+**Notes:**
+- `(x, y)` is the top-left corner
+- `corner_radius` creates rounded corners; automatically clamped to half the smallest dimension
 
 ### Line
 

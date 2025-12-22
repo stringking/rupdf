@@ -388,7 +388,7 @@ impl<'a> PdfGenerator<'a> {
             }
             let (r, g, b) = fill.to_rgb_floats();
             content.set_fill_rgb(r, g, b);
-            content.rect(rect.x, pdf_y, rect.w, rect.h);
+            Self::draw_rect_path(content, rect.x, pdf_y, rect.w, rect.h, rect.corner_radius);
             content.fill_nonzero();
         }
 
@@ -401,11 +401,73 @@ impl<'a> PdfGenerator<'a> {
             let (r, g, b) = rect.stroke_color.to_rgb_floats();
             content.set_stroke_rgb(r, g, b);
             content.set_line_width(rect.stroke);
-            content.rect(rect.x, pdf_y, rect.w, rect.h);
+            Self::draw_rect_path(content, rect.x, pdf_y, rect.w, rect.h, rect.corner_radius);
             content.stroke();
         }
 
         content.restore_state();
+    }
+
+    /// Draw a rectangle path, optionally with rounded corners
+    fn draw_rect_path(content: &mut Content, x: f32, y: f32, w: f32, h: f32, radius: f32) {
+        if radius <= 0.0 {
+            // Simple rectangle
+            content.rect(x, y, w, h);
+        } else {
+            // Rounded rectangle using cubic Bézier curves
+            // Clamp radius to half the smallest dimension
+            let r = radius.min(w / 2.0).min(h / 2.0);
+
+            // Control point factor for quarter-circle approximation
+            // k = 4/3 * (sqrt(2) - 1) ≈ 0.5523
+            let k = 0.5523;
+            let c = r * k;
+
+            // Start at top-left, after the corner curve
+            content.move_to(x + r, y + h);
+
+            // Top edge (left to right)
+            content.line_to(x + w - r, y + h);
+
+            // Top-right corner
+            content.cubic_to(
+                x + w - r + c, y + h,      // control point 1
+                x + w, y + h - r + c,      // control point 2
+                x + w, y + h - r,          // end point
+            );
+
+            // Right edge (top to bottom)
+            content.line_to(x + w, y + r);
+
+            // Bottom-right corner
+            content.cubic_to(
+                x + w, y + r - c,          // control point 1
+                x + w - r + c, y,          // control point 2
+                x + w - r, y,              // end point
+            );
+
+            // Bottom edge (right to left)
+            content.line_to(x + r, y);
+
+            // Bottom-left corner
+            content.cubic_to(
+                x + r - c, y,              // control point 1
+                x, y + r - c,              // control point 2
+                x, y + r,                  // end point
+            );
+
+            // Left edge (bottom to top)
+            content.line_to(x, y + h - r);
+
+            // Top-left corner
+            content.cubic_to(
+                x, y + h - r + c,          // control point 1
+                x + r - c, y + h,          // control point 2
+                x + r, y + h,              // end point
+            );
+
+            content.close_path();
+        }
     }
 
     fn render_line(

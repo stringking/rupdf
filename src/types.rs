@@ -125,6 +125,7 @@ pub struct RectElement {
     pub stroke: f32,
     pub stroke_color: Color,
     pub fill_color: Option<Color>,
+    pub corner_radius: f32,
 }
 
 /// Line element
@@ -316,6 +317,7 @@ impl Element {
                 stroke: with_element_context(opt_or(dict, "stroke", 1.0), index)?,
                 stroke_color: with_element_context(opt_or(dict, "stroke_color", Color::black()), index)?,
                 fill_color: with_element_context(opt(dict, "fill_color"), index)?,
+                corner_radius: with_element_context(opt_or(dict, "corner_radius", 0.0), index)?,
             })),
 
             "line" => Ok(Element::Line(LineElement {

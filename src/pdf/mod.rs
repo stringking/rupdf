@@ -39,6 +39,7 @@ mod tests {
                         stroke: 1.0,
                         stroke_color: Color::black(),
                         fill_color: Some(Color { r: 200, g: 200, b: 255, a: 255 }),
+                        corner_radius: 0.0,
                     }),
                 ],
             }],
