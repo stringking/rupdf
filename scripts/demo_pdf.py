@@ -384,12 +384,13 @@ def make_textbox_page() -> dict:
 
     y += bh + 50  # Extra spacing between sections
 
-    # Word wrapping demonstration
-    elements.append(section_label(MARGIN, y, "Word Wrapping"))
+    # Word wrapping + explicit newlines
+    elements.append(section_label(MARGIN, y, "Text Handling: Word Wrapping + Explicit Line Breaks (\\n)"))
     y += 15
 
-    long_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation."
-    bw, bh = 200, 100
+    # Auto word wrapping
+    long_text = "Long text auto-wraps to fit box width. Words flow naturally without breaking mid-word."
+    bw, bh = 150, 70
     elements.append({
         "type": "rect",
         "x": MARGIN, "y": y, "w": bw, "h": bh,
@@ -400,28 +401,58 @@ def make_textbox_page() -> dict:
         "x": MARGIN, "y": y, "w": bw, "h": bh,
         "text_align_y": "top",
         "text": long_text,
-        "font": "sans", "size": 10,
-        "line_height": 13
+        "font": "sans", "size": 9,
+        "line_height": 12
+    })
+    elements.append({
+        "type": "text", "x": MARGIN, "y": y + bh + 10,
+        "text": "Auto word wrap", "font": "sans", "size": 8,
+        "color": (100, 100, 100, 255)
     })
 
-    # Line height comparison
-    elements.append(section_label(MARGIN + bw + 40, y - 15, "Line Height"))
-    line_heights = [12, 16, 20]
-    for i, lh in enumerate(line_heights):
-        bx = MARGIN + bw + 40 + i * 100
-        elements.append({
-            "type": "rect",
-            "x": bx, "y": y, "w": 90, "h": 100,
-            "stroke": 0.5, "stroke_color": (200, 200, 200, 255)
-        })
-        elements.append({
-            "type": "textbox",
-            "x": bx, "y": y, "w": 90, "h": 100,
-            "text_align_y": "top",
-            "text": f"line_height={lh}\nLine 2\nLine 3\nLine 4",
-            "font": "sans", "size": 10,
-            "line_height": lh
-        })
+    # Explicit newlines with blank line
+    newline_text = "Line 1\n\nLine 3 (blank above)\nLine 4"
+    bx2 = MARGIN + bw + 20
+    elements.append({
+        "type": "rect",
+        "x": bx2, "y": y, "w": bw, "h": bh,
+        "stroke": 1, "stroke_color": (180, 180, 180, 255)
+    })
+    elements.append({
+        "type": "textbox",
+        "x": bx2, "y": y, "w": bw, "h": bh,
+        "text_align_y": "top",
+        "text": newline_text,
+        "font": "sans", "size": 9,
+        "line_height": 12
+    })
+    elements.append({
+        "type": "text", "x": bx2, "y": y + bh + 10,
+        "text": "Explicit \\n (blank line)", "font": "sans", "size": 8,
+        "color": (100, 100, 100, 255)
+    })
+
+    # Combination: explicit breaks + wrapping
+    combo_text = "First paragraph with enough text to trigger word wrapping.\n\nSecond paragraph also wraps."
+    bx3 = bx2 + bw + 20
+    elements.append({
+        "type": "rect",
+        "x": bx3, "y": y, "w": bw, "h": bh,
+        "stroke": 1, "stroke_color": (180, 180, 180, 255)
+    })
+    elements.append({
+        "type": "textbox",
+        "x": bx3, "y": y, "w": bw, "h": bh,
+        "text_align_y": "top",
+        "text": combo_text,
+        "font": "sans", "size": 9,
+        "line_height": 12
+    })
+    elements.append({
+        "type": "text", "x": bx3, "y": y + bh + 10,
+        "text": "\\n + word wrap", "font": "sans", "size": 8,
+        "color": (100, 100, 100, 255)
+    })
 
     return {"size": (PAGE_W, PAGE_H), "elements": elements}
 
