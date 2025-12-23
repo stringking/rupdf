@@ -49,6 +49,14 @@ impl<'a> PdfGenerator<'a> {
                             .or_insert_with(|| FontEmbedder::new(font, &t.font));
                         embedder.use_text(&t.text)?;
                     }
+                    Element::TextBox(tb) => {
+                        let font = self.resources.get_font(&tb.font)?;
+                        alias_to_ps.entry(tb.font.clone()).or_insert_with(|| font.postscript_name.clone());
+                        let embedder = font_embedders
+                            .entry(tb.font.clone())
+                            .or_insert_with(|| FontEmbedder::new(font, &tb.font));
+                        embedder.use_text(&tb.text)?;
+                    }
                     Element::Barcode(b) if b.human_readable => {
                         let font = self.resources.get_font(&b.font)?;
                         alias_to_ps.entry(b.font.clone()).or_insert_with(|| font.postscript_name.clone());
@@ -269,6 +277,9 @@ impl<'a> PdfGenerator<'a> {
                 Element::Text(t) => {
                     self.render_text(&mut content, t, page.height, font_embedders, alias_to_ps, alpha_states)?;
                 }
+                Element::TextBox(tb) => {
+                    self.render_textbox(&mut content, tb, page.height, font_embedders, alias_to_ps, alpha_states)?;
+                }
                 Element::Rect(r) => {
                     self.render_rect(&mut content, r, page.height, alpha_states);
                 }
@@ -323,12 +334,12 @@ impl<'a> PdfGenerator<'a> {
 
         // Calculate baseline position based on vertical anchor
         // - baseline: y is the text baseline
-        // - cap_top: y is the top of capital letters
-        // - center: y is the midpoint between baseline and cap_top
+        // - capline: y is the top of capital letters
+        // - center: y is the midpoint between baseline and capline
         let cap_height_pts = font.cap_height_pts(text.size);
         let baseline_y = match text.vertical_anchor {
             VerticalAnchor::Baseline => page_height - text.y,
-            VerticalAnchor::CapTop => page_height - text.y - cap_height_pts,
+            VerticalAnchor::Capline => page_height - text.y - cap_height_pts,
             VerticalAnchor::Center => page_height - text.y - cap_height_pts / 2.0,
         };
 
@@ -362,6 +373,118 @@ impl<'a> PdfGenerator<'a> {
         content.show(Str(&encoded));
         content.end_text();
 
+        content.restore_state();
+
+        Ok(())
+    }
+
+    fn render_textbox(
+        &self,
+        content: &mut Content,
+        textbox: &TextBoxElement,
+        page_height: f32,
+        font_embedders: &HashMap<String, FontEmbedder>,
+        alias_to_ps: &HashMap<String, String>,
+        alpha_states: &HashMap<u8, Ref>,
+    ) -> Result<()> {
+        let font = self.resources.get_font(&textbox.font)?;
+        let embedder = font_embedders.get(&textbox.font).expect("font was collected");
+        let ps_name = alias_to_ps.get(&textbox.font).expect("font alias was collected");
+
+        // Step 1: Compute box position from anchor point
+        let box_left = match textbox.box_align_x {
+            BoxAlignX::Left => textbox.x,
+            BoxAlignX::Center => textbox.x - textbox.w / 2.0,
+            BoxAlignX::Right => textbox.x - textbox.w,
+        };
+        let box_top = match textbox.box_align_y {
+            BoxAlignY::Top => textbox.y,
+            BoxAlignY::Center => textbox.y - textbox.h / 2.0,
+            BoxAlignY::Bottom => textbox.y - textbox.h,
+        };
+
+        // Step 2: Word wrap text
+        let lines = font.wrap_text(&textbox.text, textbox.size, textbox.w, &textbox.font)?;
+        let num_lines = lines.len();
+        if num_lines == 0 {
+            return Ok(());
+        }
+
+        // Step 3: Calculate text block metrics
+        let cap_height = font.cap_height_pts(textbox.size);
+        let ascender = font.ascender_pts(textbox.size);
+        let descender = font.descender_pts(textbox.size).abs();
+        let text_block_height = if num_lines == 1 {
+            cap_height
+        } else {
+            (num_lines - 1) as f32 * textbox.line_height + cap_height
+        };
+
+        // Step 4: Calculate first line baseline Y (in user coords, relative to page top)
+        let last_baseline_offset = (num_lines - 1) as f32 * textbox.line_height;
+
+        let first_baseline_y = match textbox.text_align_y {
+            TextAlignY::Top => box_top + ascender,
+            TextAlignY::Capline => box_top + cap_height,
+            TextAlignY::Center => box_top + (textbox.h - text_block_height) / 2.0 + cap_height,
+            TextAlignY::Baseline => box_top + textbox.h - last_baseline_offset,
+            TextAlignY::Bottom => box_top + textbox.h - last_baseline_offset - descender,
+        };
+
+        // Step 5: Set up clipping
+        content.save_state();
+
+        // Clip to box bounds
+        let pdf_box_bottom = page_height - box_top - textbox.h;
+        content.rect(box_left, pdf_box_bottom, textbox.w, textbox.h);
+        content.clip_nonzero();
+        content.end_path();
+
+        // Set alpha if needed
+        if textbox.color.a != 255 {
+            let alpha_name = self.get_alpha_state_name(textbox.color.a, alpha_states);
+            content.set_parameters(Name(alpha_name.as_bytes()));
+        }
+
+        // Set color and font
+        let (r, g, b) = textbox.color.to_rgb_floats();
+        content.set_fill_rgb(r, g, b);
+
+        content.begin_text();
+        content.set_font(Name(ps_name.as_bytes()), textbox.size);
+
+        // Step 6: Render each line
+        let mut prev_x = 0.0;
+        let mut prev_y = 0.0;
+        for (i, line) in lines.iter().enumerate() {
+            if line.is_empty() {
+                continue;
+            }
+
+            // Calculate line baseline Y
+            let line_y = first_baseline_y + i as f32 * textbox.line_height;
+            let pdf_y = page_height - line_y;
+
+            // Calculate line X based on text alignment
+            let line_width = font.text_width(line, textbox.size, &textbox.font)?;
+            let line_x = match textbox.text_align_x {
+                TextAlign::Left => box_left,
+                TextAlign::Center => box_left + (textbox.w - line_width) / 2.0,
+                TextAlign::Right => box_left + textbox.w - line_width,
+            };
+
+            // Td operator is relative to previous position, so calculate offset
+            let dx = line_x - prev_x;
+            let dy = pdf_y - prev_y;
+            content.next_line(dx, dy);
+            prev_x = line_x;
+            prev_y = pdf_y;
+
+            let encoded = embedder.encode_text(line);
+            content.show(Str(&encoded));
+        }
+
+        content.end_text();
         content.restore_state();
 
         Ok(())

@@ -121,6 +121,59 @@ impl LoadedFont {
     pub fn cap_height_pts(&self, size: f32) -> f32 {
         self.cap_height as f32 * size / self.units_per_em as f32
     }
+
+    /// Get descender in points for given font size (returns negative value)
+    pub fn descender_pts(&self, size: f32) -> f32 {
+        self.descender as f32 * size / self.units_per_em as f32
+    }
+
+    /// Wrap text to fit within max_width, returning lines
+    pub fn wrap_text(&self, text: &str, size: f32, max_width: f32, font_name: &str) -> Result<Vec<String>> {
+        let mut lines = Vec::new();
+
+        for paragraph in text.split('\n') {
+            if paragraph.is_empty() {
+                lines.push(String::new());
+                continue;
+            }
+
+            let words: Vec<&str> = paragraph.split_whitespace().collect();
+            if words.is_empty() {
+                lines.push(String::new());
+                continue;
+            }
+
+            let mut current_line = String::new();
+            let mut current_width = 0.0;
+            let space_width = self.text_width(" ", size, font_name)?;
+
+            for word in words {
+                let word_width = self.text_width(word, size, font_name)?;
+
+                if current_line.is_empty() {
+                    // First word on line - always add it (even if too wide)
+                    current_line = word.to_string();
+                    current_width = word_width;
+                } else if current_width + space_width + word_width <= max_width {
+                    // Word fits
+                    current_line.push(' ');
+                    current_line.push_str(word);
+                    current_width += space_width + word_width;
+                } else {
+                    // Word doesn't fit - start new line
+                    lines.push(current_line);
+                    current_line = word.to_string();
+                    current_width = word_width;
+                }
+            }
+
+            if !current_line.is_empty() {
+                lines.push(current_line);
+            }
+        }
+
+        Ok(lines)
+    }
 }
 
 /// Loaded image data

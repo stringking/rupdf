@@ -83,8 +83,8 @@ impl<'source> FromPyObject<'source> for TextAlign {
 pub enum VerticalAnchor {
     #[default]
     Baseline,  // y is the text baseline
-    CapTop,    // y is the top of capital letters (cap height)
-    Center,    // y is the midpoint between baseline and cap_top
+    Capline,   // y is the top of capital letters (cap height)
+    Center,    // y is the midpoint between baseline and capline
 }
 
 impl<'source> FromPyObject<'source> for VerticalAnchor {
@@ -92,10 +92,86 @@ impl<'source> FromPyObject<'source> for VerticalAnchor {
         let s: String = ob.extract()?;
         match s.as_str() {
             "baseline" => Ok(VerticalAnchor::Baseline),
-            "cap_top" => Ok(VerticalAnchor::CapTop),
+            "capline" => Ok(VerticalAnchor::Capline),
             "center" => Ok(VerticalAnchor::Center),
             _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "Invalid vertical_anchor: '{}'. Must be 'baseline', 'cap_top', or 'center'",
+                "Invalid vertical_anchor: '{}'. Must be 'baseline', 'capline', or 'center'",
+                s
+            ))),
+        }
+    }
+}
+
+/// Box horizontal alignment (determines how x relates to box position)
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum BoxAlignX {
+    #[default]
+    Left,   // x is left edge of box
+    Center, // x is center of box
+    Right,  // x is right edge of box
+}
+
+impl<'source> FromPyObject<'source> for BoxAlignX {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        let s: String = ob.extract()?;
+        match s.as_str() {
+            "left" => Ok(BoxAlignX::Left),
+            "center" => Ok(BoxAlignX::Center),
+            "right" => Ok(BoxAlignX::Right),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid box_align_x: '{}'. Must be 'left', 'center', or 'right'",
+                s
+            ))),
+        }
+    }
+}
+
+/// Box vertical alignment (determines how y relates to box position)
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum BoxAlignY {
+    #[default]
+    Top,    // y is top edge of box
+    Center, // y is center of box
+    Bottom, // y is bottom edge of box
+}
+
+impl<'source> FromPyObject<'source> for BoxAlignY {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        let s: String = ob.extract()?;
+        match s.as_str() {
+            "top" => Ok(BoxAlignY::Top),
+            "center" => Ok(BoxAlignY::Center),
+            "bottom" => Ok(BoxAlignY::Bottom),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid box_align_y: '{}'. Must be 'top', 'center', or 'bottom'",
+                s
+            ))),
+        }
+    }
+}
+
+/// Text vertical alignment inside a TextBox
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum TextAlignY {
+    Top,      // ascender of first line at box top
+    Capline,  // cap height of first line at box top
+    Center,   // text block vertically centered in box
+    #[default]
+    Baseline, // last baseline at box bottom
+    Bottom,   // descender of last line at box bottom
+}
+
+impl<'source> FromPyObject<'source> for TextAlignY {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        let s: String = ob.extract()?;
+        match s.as_str() {
+            "top" => Ok(TextAlignY::Top),
+            "capline" => Ok(TextAlignY::Capline),
+            "center" => Ok(TextAlignY::Center),
+            "baseline" => Ok(TextAlignY::Baseline),
+            "bottom" => Ok(TextAlignY::Bottom),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid text_align_y: '{}'. Must be 'top', 'capline', 'center', 'baseline', or 'bottom'",
                 s
             ))),
         }
@@ -174,10 +250,29 @@ pub struct QRCodeElement {
     pub background: Color,  // Background color (light modules)
 }
 
+/// TextBox element - multi-line text with word wrapping
+#[derive(Debug, Clone)]
+pub struct TextBoxElement {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub box_align_x: BoxAlignX,
+    pub box_align_y: BoxAlignY,
+    pub text_align_x: TextAlign,
+    pub text_align_y: TextAlignY,
+    pub text: String,
+    pub font: String,
+    pub size: f32,
+    pub line_height: f32,
+    pub color: Color,
+}
+
 /// All element types
 #[derive(Debug, Clone)]
 pub enum Element {
     Text(TextElement),
+    TextBox(TextBoxElement),
     Rect(RectElement),
     Line(LineElement),
     Image(ImageElement),
@@ -308,6 +403,26 @@ impl Element {
                 align: with_element_context(opt_default(dict, "align"), index)?,
                 vertical_anchor: with_element_context(opt_default(dict, "vertical_anchor"), index)?,
             })),
+
+            "textbox" => {
+                let size: f32 = with_element_context(req(dict, "size"), index)?;
+                let line_height: f32 = with_element_context(opt_or(dict, "line_height", size * 1.2), index)?;
+                Ok(Element::TextBox(TextBoxElement {
+                    x: with_element_context(req(dict, "x"), index)?,
+                    y: with_element_context(req(dict, "y"), index)?,
+                    w: with_element_context(req(dict, "w"), index)?,
+                    h: with_element_context(req(dict, "h"), index)?,
+                    box_align_x: with_element_context(opt_default(dict, "box_align_x"), index)?,
+                    box_align_y: with_element_context(opt_default(dict, "box_align_y"), index)?,
+                    text_align_x: with_element_context(opt_default(dict, "text_align_x"), index)?,
+                    text_align_y: with_element_context(opt_default(dict, "text_align_y"), index)?,
+                    text: with_element_context(req(dict, "text"), index)?,
+                    font: with_element_context(req(dict, "font"), index)?,
+                    size,
+                    line_height,
+                    color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
+                }))
+            }
 
             "rect" => Ok(Element::Rect(RectElement {
                 x: with_element_context(req(dict, "x"), index)?,

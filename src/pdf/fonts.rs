@@ -30,9 +30,13 @@ impl<'a> FontEmbedder<'a> {
         Ok(glyph_id)
     }
 
-    /// Register all characters in a string
+    /// Register all characters in a string (skips control characters like newlines)
     pub fn use_text(&mut self, text: &str) -> Result<()> {
         for ch in text.chars() {
+            // Skip control characters (newlines, tabs, etc.) - they have no glyphs
+            if ch.is_control() {
+                continue;
+            }
             self.use_char(ch)?;
         }
         Ok(())

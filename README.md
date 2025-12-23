@@ -99,7 +99,7 @@ Common page sizes:
     "size": 12,                   # Font size in points
     "color": (0, 0, 0, 255),      # RGBA (optional, default black)
     "align": "left",              # "left", "center", or "right" (optional)
-    "vertical_anchor": "baseline" # "baseline", "cap_top", or "center" (optional)
+    "vertical_anchor": "baseline" # "baseline", "capline", or "center" (optional)
 }
 ```
 
@@ -111,8 +111,55 @@ Common page sizes:
   - `"right"`: text extends to the left of x
 - `vertical_anchor` controls vertical alignment relative to y:
   - `"baseline"` (default): y is the text baseline
-  - `"cap_top"`: y is the top of capital letters
+  - `"capline"`: y is the top of capital letters
   - `"center"`: y is the vertical center of capital letters
+
+### TextBox
+
+Multi-line text with word wrapping, like Illustrator's "area type".
+
+```python
+{
+    "type": "textbox",
+    "x": 72,
+    "y": 72,
+    "w": 200,
+    "h": 100,
+    "text": "Long text that will wrap within the box...",
+    "font": "font_ref",
+    "size": 12,
+    "line_height": 14.4,          # Optional, default = size * 1.2
+    "color": (0, 0, 0, 255),      # Optional, default black
+
+    # Box alignment (how the box is positioned relative to x, y)
+    "box_align_x": "left",        # "left", "center", or "right" (optional)
+    "box_align_y": "top",         # "top", "center", or "bottom" (optional)
+
+    # Text alignment (how text is positioned inside the box)
+    "text_align_x": "left",       # "left", "center", or "right" (optional)
+    "text_align_y": "baseline"    # "top", "capline", "center", "baseline", or "bottom" (optional)
+}
+```
+
+**Two-Layer Alignment:**
+
+1. **Box alignment** - positions the box relative to `(x, y)`:
+   - `box_align_x`: left=x is left edge, center=x is center, right=x is right edge
+   - `box_align_y`: top=y is top edge, center=y is center, bottom=y is bottom edge
+
+2. **Text alignment** - positions text inside the box:
+   - `text_align_x`: per-line horizontal alignment (left/center/right)
+   - `text_align_y`: vertical alignment of the text block:
+     - `"top"`: ascender of first line at box top
+     - `"capline"`: cap height of first line at box top
+     - `"center"`: text block vertically centered
+     - `"baseline"` (default): last line's baseline at box bottom
+     - `"bottom"`: descender of last line at box bottom
+
+**Notes:**
+- Text wraps at word boundaries to fit within `w`
+- Overflow is clipped to box bounds
+- Explicit `\n` in text creates line breaks
 
 ### Rectangle
 

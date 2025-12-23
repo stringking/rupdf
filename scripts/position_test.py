@@ -159,13 +159,13 @@ def main():
         "vertical_anchor": "baseline"
     })
 
-    # cap_top anchor - top of caps sits on the line
+    # capline anchor - top of caps sits on the line
     elements.append({
         "type": "text",
         "x": 140, "y": anchor_y,
-        "text": "CapTop",
+        "text": "Capline",
         "font": "helvetica", "size": font_size,
-        "vertical_anchor": "cap_top"
+        "vertical_anchor": "capline"
     })
 
     # center anchor - vertical center sits on the line
@@ -387,6 +387,82 @@ def main():
         "type": "rect",
         "x": 98, "y": 598, "w": 4, "h": 4,
         "fill_color": (255, 0, 0, 255)
+    })
+
+    # === TEXTBOX TESTS ===
+    # Basic TextBox with wrapping
+    elements.append({
+        "type": "rect",
+        "x": 300, "y": 580, "w": 180, "h": 80,
+        "stroke": 1, "stroke_color": (150, 150, 150, 255)
+    })
+    elements.append({
+        "type": "textbox",
+        "x": 300, "y": 580,
+        "w": 180, "h": 80,
+        "text": "This is a TextBox with word wrapping. The text should wrap at word boundaries.",
+        "font": "helvetica",
+        "size": 11,
+        "color": (0, 0, 0, 255)
+    })
+    elements.append({
+        "type": "text",
+        "x": 300, "y": 570,
+        "text": "textbox @ (300, 580) 180x80",
+        "font": "helvetica", "size": 9
+    })
+
+    # TextBox with center alignment
+    elements.append({
+        "type": "rect",
+        "x": 300, "y": 690, "w": 180, "h": 60,
+        "stroke": 1, "stroke_color": (150, 150, 150, 255)
+    })
+    elements.append({
+        "type": "textbox",
+        "x": 300, "y": 690,
+        "w": 180, "h": 60,
+        "text": "Centered text in box",
+        "font": "helvetica",
+        "size": 12,
+        "text_align_x": "center",
+        "text_align_y": "center",
+        "color": (0, 100, 200, 255)
+    })
+    elements.append({
+        "type": "text",
+        "x": 300, "y": 680,
+        "text": "textbox center/center",
+        "font": "helvetica", "size": 9
+    })
+
+    # TextBox with box_align_x=center (box centered on x)
+    elements.append({
+        "type": "line",
+        "x1": 510, "y1": 580, "x2": 510, "y2": 680,
+        "stroke": 1, "color": (255, 0, 0, 255)
+    })
+    elements.append({
+        "type": "rect",
+        "x": 510 - 80, "y": 600, "w": 160, "h": 60,
+        "stroke": 1, "stroke_color": (200, 200, 200, 255)
+    })
+    elements.append({
+        "type": "textbox",
+        "x": 510, "y": 600,
+        "w": 160, "h": 60,
+        "box_align_x": "center",
+        "text": "Box centered on x=510",
+        "font": "helvetica",
+        "size": 11,
+        "text_align_x": "center",
+        "text_align_y": "capline"
+    })
+    elements.append({
+        "type": "text",
+        "x": 510, "y": 590,
+        "text": "box_align_x=center, x=510",
+        "font": "helvetica", "size": 8, "align": "center"
     })
 
     doc = {

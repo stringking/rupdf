@@ -10,25 +10,26 @@ import pytest
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 FIXTURES_DIR = PROJECT_ROOT / "fixtures"
-TESTS_DIR = PROJECT_ROOT / "tests"
+ASSETS_DIR = PROJECT_ROOT / "assets"
 
-# Font paths (may not exist on all systems)
+# Font paths - use assets directory
 FONT_PATHS = {
-    "sans": "/Users/lee/Downloads/ibm-plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf",
-    "sans-bold": "/Users/lee/Downloads/ibm-plex-sans/fonts/complete/ttf/IBMPlexSans-Bold.ttf",
-    "mono": "/Users/lee/Downloads/ibm-plex-mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf",
+    "sans": ASSETS_DIR / "IBMPlexSans-Regular.otf",
+    "sans-bold": ASSETS_DIR / "IBMPlexSans-Bold.otf",
+    "mono": ASSETS_DIR / "IBMPlexMono-Regular.otf",
+    "mono-bold": ASSETS_DIR / "IBMPlexMono-Bold.otf",
 }
 
 # Test assets
-SVG_PATH = TESTS_DIR / "StringKing-Text-Black.svg"
-PNG_PATH = TESTS_DIR / "rMQgX7DBd2zUe68iGYOM.png"
+SVG_PATH = ASSETS_DIR / "test-svg.svg"
+PNG_PATH = ASSETS_DIR / "test-png.png"
 
 
 def get_available_font() -> Optional[str]:
     """Return path to first available font, or None."""
     for path in FONT_PATHS.values():
-        if os.path.exists(path):
-            return path
+        if path.exists():
+            return str(path)
     return None
 
 
