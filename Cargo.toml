@@ -1,9 +1,12 @@
 [package]
 name = "rupdf"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 license = "MIT"
 description = "A fast, minimal PDF page renderer"
+repository = "https://github.com/stringking/rupdf"
+homepage = "https://github.com/stringking/rupdf"
+documentation = "https://github.com/stringking/rupdf#readme"
 
 [lib]
 name = "rupdf"

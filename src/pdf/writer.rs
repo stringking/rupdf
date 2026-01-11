@@ -2,7 +2,7 @@ use crate::error::{Result, RupdfError};
 use crate::pdf::FontEmbedder;
 use crate::resources::{LoadedImage, LoadedResources};
 use crate::types::*;
-use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
+use pdf_writer::{Content, Date, Filter, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
 use std::collections::HashMap;
 
 /// Main PDF generator
@@ -136,6 +136,7 @@ impl<'a> PdfGenerator<'a> {
             || self.doc.metadata.author.is_some()
             || self.doc.metadata.subject.is_some()
             || self.doc.metadata.creator.is_some()
+            || self.doc.metadata.creation_date.is_some()
         {
             let info_ref = ref_alloc.bump();
             let mut info = pdf.document_info(info_ref);
@@ -150,6 +151,11 @@ impl<'a> PdfGenerator<'a> {
             }
             if let Some(creator) = &self.doc.metadata.creator {
                 info.creator(TextStr(creator));
+            }
+            if let Some(date_str) = &self.doc.metadata.creation_date {
+                if let Some(date) = parse_pdf_date(date_str) {
+                    info.creation_date(date);
+                }
             }
             info.finish();
         }
@@ -953,4 +959,74 @@ impl<'a> PdfGenerator<'a> {
         }
         rgb
     }
+}
+
+/// Parse a date string into a PDF Date.
+/// Supports ISO 8601 formats: "YYYY-MM-DD", "YYYY-MM-DDTHH:MM:SS", "YYYY-MM-DDTHH:MM:SSZ",
+/// "YYYY-MM-DDTHH:MM:SS+HH:MM" or "-HH:MM"
+fn parse_pdf_date(s: &str) -> Option<Date> {
+    let s = s.trim();
+    if s.len() < 10 {
+        return None;
+    }
+
+    // Parse date part: YYYY-MM-DD
+    let year: u16 = s.get(0..4)?.parse().ok()?;
+    if s.as_bytes().get(4) != Some(&b'-') {
+        return None;
+    }
+    let month: u8 = s.get(5..7)?.parse().ok()?;
+    if s.as_bytes().get(7) != Some(&b'-') {
+        return None;
+    }
+    let day: u8 = s.get(8..10)?.parse().ok()?;
+
+    // Check for time part
+    if s.len() == 10 {
+        return Some(Date::new(year).month(month).day(day));
+    }
+
+    // Expect 'T' separator
+    if s.as_bytes().get(10) != Some(&b'T') {
+        return None;
+    }
+
+    if s.len() < 19 {
+        return None;
+    }
+
+    // Parse time: HH:MM:SS
+    let hour: u8 = s.get(11..13)?.parse().ok()?;
+    if s.as_bytes().get(13) != Some(&b':') {
+        return None;
+    }
+    let minute: u8 = s.get(14..16)?.parse().ok()?;
+    if s.as_bytes().get(16) != Some(&b':') {
+        return None;
+    }
+    let second: u8 = s.get(17..19)?.parse().ok()?;
+
+    let mut date = Date::new(year)
+        .month(month)
+        .day(day)
+        .hour(hour)
+        .minute(minute)
+        .second(second);
+
+    // Check for timezone
+    if s.len() == 19 {
+        return Some(date);
+    }
+
+    let tz_part = &s[19..];
+    if tz_part == "Z" {
+        date = date.utc_offset_hour(0).utc_offset_minute(0);
+    } else if tz_part.len() == 6 && (tz_part.starts_with('+') || tz_part.starts_with('-')) {
+        let sign: i8 = if tz_part.starts_with('-') { -1 } else { 1 };
+        let tz_hour: i8 = tz_part.get(1..3)?.parse::<i8>().ok()? * sign;
+        let tz_min: u8 = tz_part.get(4..6)?.parse().ok()?;
+        date = date.utc_offset_hour(tz_hour).utc_offset_minute(tz_min);
+    }
+
+    Some(date)
 }
