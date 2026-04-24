@@ -8,7 +8,7 @@ A fast, minimal PDF renderer in Rust with Python bindings. Takes pre-laid-out pa
 - **Rectangles** with stroke, fill, and rounded corners
 - **Lines** with configurable width
 - **Images** (PNG, JPEG, WebP, SVG)
-- **Barcodes** (Code 128, GS1-128) and **QR codes**
+- **Barcodes** (Code 128, GS1-128), **Data Matrix** (incl. GS1 DataMatrix), and **QR codes**
 - **Font subsetting** - embeds only used glyphs
 - **Compression** - optional zlib compression
 
@@ -244,6 +244,30 @@ after variable-length fields, and fixed-length AIs (00, 01-04, 11-19, 20,
     "human_readable": True,  # renders the parenthesized form below the bars
     "font": "font_ref",
     "font_size": 9
+}
+```
+
+### Data Matrix (incl. GS1 DataMatrix)
+
+```python
+# Plain ECC 200 Data Matrix
+{
+    "type": "datamatrix",
+    "x": 72,
+    "y": 72,
+    "size": 80,                # bounding-box dimension
+    "value": "UNIT-42",
+    "color": (0, 0, 0, 255),         # optional
+    "background": (255, 255, 255, 255)  # optional
+}
+
+# GS1 Data Matrix — same parenthesized (AI)data form as GS1-128
+{
+    "type": "gs1_datamatrix",  # also "gs1-datamatrix"
+    "x": 72,
+    "y": 72,
+    "size": 80,
+    "value": "(01)12345678901234(17)260101(10)BATCH123"
 }
 ```
 

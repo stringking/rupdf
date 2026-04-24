@@ -314,6 +314,9 @@ impl<'a> PdfGenerator<'a> {
                 Element::QRCode(qr) => {
                     self.render_qrcode(&mut content, qr, page.height, alpha_states)?;
                 }
+                Element::DataMatrix(dm) => {
+                    self.render_datamatrix(&mut content, dm, page.height, alpha_states)?;
+                }
             }
         }
 
@@ -798,60 +801,129 @@ impl<'a> PdfGenerator<'a> {
     ) -> Result<()> {
         use rubar_core::encode_qr;
 
-        // Save state to isolate graphics state changes
-        content.save_state();
-
         let geometry = encode_qr(&qr.value).map_err(|e| RupdfError::InvalidBarcode {
             value: qr.value.clone(),
             reason: e.to_string(),
         })?;
 
-        if geometry.size == 0 {
+        self.render_matrix(
+            content,
+            &geometry,
+            qr.x,
+            qr.y,
+            qr.size,
+            &qr.color,
+            &qr.background,
+            page_height,
+            alpha_states,
+        );
+        Ok(())
+    }
+
+    fn render_datamatrix(
+        &self,
+        content: &mut Content,
+        dm: &DataMatrixElement,
+        page_height: f32,
+        alpha_states: &HashMap<u8, Ref>,
+    ) -> Result<()> {
+        use rubar_core::{encode_datamatrix, gs1};
+
+        let payload = match dm.kind {
+            DataMatrixKind::Plain => dm.value.as_bytes().to_vec(),
+            DataMatrixKind::Gs1 => {
+                let fields = gs1::parse(&dm.value).map_err(|e| RupdfError::InvalidBarcode {
+                    value: dm.value.clone(),
+                    reason: e.to_string(),
+                })?;
+                gs1::to_datamatrix_bytes(&fields)
+            }
+        };
+        let is_gs1 = matches!(dm.kind, DataMatrixKind::Gs1);
+
+        let geometry = encode_datamatrix(&payload, is_gs1).map_err(|e| RupdfError::InvalidBarcode {
+            value: dm.value.clone(),
+            reason: e.to_string(),
+        })?;
+
+        self.render_matrix(
+            content,
+            &geometry,
+            dm.x,
+            dm.y,
+            dm.size,
+            &dm.color,
+            &dm.background,
+            page_height,
+            alpha_states,
+        );
+        Ok(())
+    }
+
+    /// Shared drawing logic for matrix symbologies (QR, Data Matrix).
+    ///
+    /// `size` is the bounding-box dimension. For square matrices the result
+    /// is a `size × size` block. For rectangular matrices (Data Matrix can be
+    /// e.g. 16×36) the longer axis fills `size` and modules stay square.
+    #[allow(clippy::too_many_arguments)]
+    fn render_matrix(
+        &self,
+        content: &mut Content,
+        geometry: &rubar_core::MatrixGeometry,
+        x: f32,
+        y: f32,
+        size: f32,
+        color: &Color,
+        background: &Color,
+        page_height: f32,
+        alpha_states: &HashMap<u8, Ref>,
+    ) {
+        content.save_state();
+
+        if geometry.width == 0 || geometry.height == 0 {
             content.restore_state();
-            return Ok(());
+            return;
         }
 
-        // Calculate module size
-        let module_size = qr.size / geometry.size as f32;
+        // Module size keeps cells square; the longer axis fills `size`.
+        let module_size = size / geometry.width.max(geometry.height) as f32;
+        let rendered_w = geometry.width as f32 * module_size;
+        let rendered_h = geometry.height as f32 * module_size;
 
-        // Convert to PDF coordinates
-        let qr_top_y = page_height - qr.y;
+        let top_y = page_height - y;
 
-        // Draw background if not white
-        if qr.background.r != 255 || qr.background.g != 255 || qr.background.b != 255 {
-            if qr.background.a != 255 {
-                let alpha_name = self.get_alpha_state_name(qr.background.a, alpha_states);
+        // Background fill (uses the bounding box, not the rendered rect)
+        if background.r != 255 || background.g != 255 || background.b != 255 {
+            if background.a != 255 {
+                let alpha_name = self.get_alpha_state_name(background.a, alpha_states);
                 content.set_parameters(Name(alpha_name.as_bytes()));
             }
-            let (r, g, b) = qr.background.to_rgb_floats();
+            let (r, g, b) = background.to_rgb_floats();
             content.set_fill_rgb(r, g, b);
-            content.rect(qr.x, qr_top_y - qr.size, qr.size, qr.size);
+            content.rect(x, top_y - rendered_h, rendered_w, rendered_h);
             content.fill_nonzero();
         }
 
-        // Set foreground color
-        if qr.color.a != 255 {
-            let alpha_name = self.get_alpha_state_name(qr.color.a, alpha_states);
+        // Foreground modules
+        if color.a != 255 {
+            let alpha_name = self.get_alpha_state_name(color.a, alpha_states);
             content.set_parameters(Name(alpha_name.as_bytes()));
         }
-        let (r, g, b) = qr.color.to_rgb_floats();
+        let (r, g, b) = color.to_rgb_floats();
         content.set_fill_rgb(r, g, b);
 
-        // Draw dark modules from the bool matrix
         for (row, line) in geometry.modules.iter().enumerate() {
             for (col, &dark) in line.iter().enumerate() {
                 if dark {
-                    let x = qr.x + col as f32 * module_size;
-                    let y = qr_top_y - (row + 1) as f32 * module_size;
-                    content.rect(x, y, module_size, module_size);
+                    let mx = x + col as f32 * module_size;
+                    let my = top_y - (row + 1) as f32 * module_size;
+                    content.rect(mx, my, module_size, module_size);
                 }
             }
         }
         content.fill_nonzero();
 
         content.restore_state();
-
-        Ok(())
     }
 
     fn write_image(&self, pdf: &mut Pdf, image_ref: Ref, loaded: &LoadedImage, name: &str, max_size_pts: (f32, f32)) -> Result<()> {

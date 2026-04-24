@@ -117,6 +117,28 @@ class QRCodeElement(TypedDict, total=False):
     background: Color  # background (light modules)
 
 
+class DataMatrixElement(TypedDict, total=False):
+    """Data Matrix (ECC 200) barcode.
+
+    Use type "gs1_datamatrix" (aliased "gs1-datamatrix") to encode a GS1
+    Data Matrix from the parenthesized AI form, e.g.
+    "(01)12345678901234(17)260101(10)BATCH123". Fixed-length AIs are
+    validated; the FNC1 designator is added automatically.
+
+    `size` is the bounding-box dimension. For square symbols the result is
+    a `size × size` block; rectangular symbols (rare with default settings)
+    fill the longer axis to `size` and keep modules square.
+    """
+
+    type: Literal["datamatrix", "gs1_datamatrix", "gs1-datamatrix"]
+    x: float
+    y: float
+    size: float
+    value: str
+    color: Color  # foreground (dark modules)
+    background: Color  # background (light modules)
+
+
 Element = Union[
     TextElement,
     TextBoxElement,
@@ -126,6 +148,7 @@ Element = Union[
     BarcodeElement,
     GS1_128Element,
     QRCodeElement,
+    DataMatrixElement,
 ]
 
 

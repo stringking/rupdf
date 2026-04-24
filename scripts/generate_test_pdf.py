@@ -508,6 +508,27 @@ def build_document(fonts: dict, images: dict) -> dict:
         "align": "center",
     })
 
+    y += 100
+
+    # GS1 Data Matrix (pharma/industrial use)
+    elements_page1.append({
+        "type": "gs1_datamatrix",
+        "x": MARGIN,
+        "y": y,
+        "size": 80,
+        "value": "(01)12345678901234(17)260101(10)BATCH123",
+    })
+    elements_page1.append({
+        "type": "text",
+        "x": MARGIN + 40,
+        "y": y + 85,
+        "text": "GS1 DataMatrix",
+        "font": default_font,
+        "size": 9,
+        "color": (0, 0, 0, 255),
+        "align": "center",
+    })
+
     # === PAGE 2 ===
     y2 = MARGIN
 

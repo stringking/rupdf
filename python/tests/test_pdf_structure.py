@@ -280,6 +280,68 @@ class TestBarcodes:
         with pytest.raises(rupdf.RupdfError):
             rupdf.render_pdf(doc)
 
+    def test_datamatrix_basic(self, font_path):
+        """Plain Data Matrix should render."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "datamatrix", "x": 72, "y": 72, "size": 80,
+                     "value": "HELLO-123"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        pdf = rupdf.render_pdf(doc)
+        assert pdf.startswith(b"%PDF-")
+
+    def test_gs1_datamatrix(self, font_path):
+        """GS1 Data Matrix from parenthesized AI form."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1_datamatrix", "x": 72, "y": 72, "size": 80,
+                     "value": "(01)12345678901234(17)260101(10)BATCH123"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        pdf = rupdf.render_pdf(doc)
+        assert pdf.startswith(b"%PDF-")
+
+    def test_gs1_datamatrix_rejects_malformed(self, font_path):
+        """Missing opening paren should raise."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1_datamatrix", "x": 72, "y": 72, "size": 80,
+                     "value": "01)12345678901234"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        with pytest.raises(rupdf.RupdfError):
+            rupdf.render_pdf(doc)
+
+    def test_datamatrix_custom_colors(self, font_path):
+        """Data Matrix honors color + background."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "datamatrix", "x": 72, "y": 72, "size": 80,
+                     "value": "TEST",
+                     "color": (0, 0, 128, 255),
+                     "background": (240, 240, 240, 255)}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        pdf = rupdf.render_pdf(doc)
+        assert pdf.startswith(b"%PDF-")
+
 
 class TestPageDimensions:
     """Test page dimension handling."""

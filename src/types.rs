@@ -268,6 +268,30 @@ pub struct QRCodeElement {
     pub background: Color,  // Background color (light modules)
 }
 
+/// Data Matrix flavour
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataMatrixKind {
+    /// Plain ECC 200 Data Matrix
+    Plain,
+    /// GS1 Data Matrix: FNC1 designator + parenthesized (AI)data value
+    Gs1,
+}
+
+/// Data Matrix element
+#[derive(Debug, Clone)]
+pub struct DataMatrixElement {
+    pub kind: DataMatrixKind,
+    pub x: f32,
+    pub y: f32,
+    /// Bounding-box dimension for the symbol. The default symbol size is
+    /// square, but if the encoder returns a rectangular symbol the longer
+    /// axis fills `size` and modules stay square (no stretching).
+    pub size: f32,
+    pub value: String,
+    pub color: Color,       // Foreground color (dark modules)
+    pub background: Color,  // Background color (light modules)
+}
+
 /// TextBox element - multi-line text with word wrapping
 #[derive(Debug, Clone)]
 pub struct TextBoxElement {
@@ -296,6 +320,7 @@ pub enum Element {
     Image(ImageElement),
     Barcode(BarcodeElement),
     QRCode(QRCodeElement),
+    DataMatrix(DataMatrixElement),
 }
 
 /// A single page
@@ -518,6 +543,22 @@ impl Element {
                 color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
                 background: with_element_context(opt_or(dict, "background", Color::white()), index)?,
             })),
+
+            "datamatrix" | "gs1_datamatrix" | "gs1-datamatrix" => {
+                let kind = match element_type.as_str() {
+                    "gs1_datamatrix" | "gs1-datamatrix" => DataMatrixKind::Gs1,
+                    _ => DataMatrixKind::Plain,
+                };
+                Ok(Element::DataMatrix(DataMatrixElement {
+                    kind,
+                    x: with_element_context(req(dict, "x"), index)?,
+                    y: with_element_context(req(dict, "y"), index)?,
+                    size: with_element_context(req(dict, "size"), index)?,
+                    value: with_element_context(req(dict, "value"), index)?,
+                    color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
+                    background: with_element_context(opt_or(dict, "background", Color::white()), index)?,
+                }))
+            }
 
             _ => Err(RupdfError::UnknownElementType(format!("Element {}: {}", index, element_type))),
         }
