@@ -47,6 +47,10 @@ tests/
 benchmarks/results/
 *.bench.json
 
+# Secrets
+.env
+.env.*
+
 # OS
 .DS_Store
 Thumbs.db

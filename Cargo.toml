@@ -22,7 +22,7 @@ usvg = "0.29"
 tiny-skia = "0.8"
 ttf-parser = "0.18"
 subsetter = "0.1"
-rubar-core = { path = "../rubar/crates/rubar-core" }
+rubar-core = "0.1.0"
 thiserror = "1.0"
 
 # Note: Criterion benchmarks require Rust 1.74+
