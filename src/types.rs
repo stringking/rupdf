@@ -277,17 +277,54 @@ pub enum DataMatrixKind {
     Gs1,
 }
 
+/// Shape constraint for Data Matrix encoding, matching
+/// [`rubar_core::DataMatrixShape`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DataMatrixShape {
+    /// Encoder picks the smallest-area symbol (may be square or rectangular).
+    #[default]
+    Any,
+    Square,
+    Rectangular,
+}
+
+impl From<DataMatrixShape> for rubar_core::DataMatrixShape {
+    fn from(s: DataMatrixShape) -> Self {
+        match s {
+            DataMatrixShape::Any => rubar_core::DataMatrixShape::Any,
+            DataMatrixShape::Square => rubar_core::DataMatrixShape::Square,
+            DataMatrixShape::Rectangular => rubar_core::DataMatrixShape::Rectangular,
+        }
+    }
+}
+
+impl<'py> FromPyObject<'_, 'py> for DataMatrixShape {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
+        let s: String = ob.extract()?;
+        match s.as_str() {
+            "any" => Ok(DataMatrixShape::Any),
+            "square" => Ok(DataMatrixShape::Square),
+            "rectangular" | "rectangle" | "rect" => Ok(DataMatrixShape::Rectangular),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid shape: '{}'. Must be 'any', 'square', or 'rectangular'",
+                s
+            ))),
+        }
+    }
+}
+
 /// Data Matrix element
 #[derive(Debug, Clone)]
 pub struct DataMatrixElement {
     pub kind: DataMatrixKind,
     pub x: f32,
     pub y: f32,
-    /// Bounding-box dimension for the symbol. The default symbol size is
-    /// square, but if the encoder returns a rectangular symbol the longer
-    /// axis fills `size` and modules stay square (no stretching).
+    /// Bounding-box dimension for the symbol. The longer axis fills `size`
+    /// and modules stay square (no stretching) when the symbol is rectangular.
     pub size: f32,
     pub value: String,
+    pub shape: DataMatrixShape,
     pub color: Color,       // Foreground color (dark modules)
     pub background: Color,  // Background color (light modules)
 }
@@ -555,6 +592,7 @@ impl Element {
                     y: with_element_context(req(dict, "y"), index)?,
                     size: with_element_context(req(dict, "size"), index)?,
                     value: with_element_context(req(dict, "value"), index)?,
+                    shape: with_element_context(opt_default(dict, "shape"), index)?,
                     color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
                     background: with_element_context(opt_or(dict, "background", Color::white()), index)?,
                 }))

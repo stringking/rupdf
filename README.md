@@ -267,9 +267,15 @@ after variable-length fields, and fixed-length AIs (00, 01-04, 11-19, 20,
     "x": 72,
     "y": 72,
     "size": 80,
-    "value": "(01)12345678901234(17)260101(10)BATCH123"
+    "value": "(01)12345678901234(17)260101(10)BATCH123",
+    "shape": "square"  # "any" (default), "square", or "rectangular"
 }
 ```
+
+Both square and rectangular shapes are valid GS1 Data Matrix per the GS1
+General Specifications. `"any"` (the default) lets the encoder pick the
+smallest-area symbol for the payload, which often turns out rectangular.
+Pick `"square"` if you need the conventional square shape.
 
 ### QR Code
 

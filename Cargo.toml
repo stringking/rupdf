@@ -1,6 +1,6 @@
 [package]
 name = "rupdf"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 license = "MIT"
 description = "A fast, minimal PDF page renderer"
@@ -22,7 +22,7 @@ usvg = "0.29"
 tiny-skia = "0.8"
 ttf-parser = "0.18"
 subsetter = "0.1"
-rubar-core = "0.1.0"
+rubar-core = "0.2.0"
 thiserror = "1.0"
 
 # Note: Criterion benchmarks require Rust 1.74+

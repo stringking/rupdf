@@ -125,9 +125,12 @@ class DataMatrixElement(TypedDict, total=False):
     "(01)12345678901234(17)260101(10)BATCH123". Fixed-length AIs are
     validated; the FNC1 designator is added automatically.
 
-    `size` is the bounding-box dimension. For square symbols the result is
-    a `size × size` block; rectangular symbols (rare with default settings)
-    fill the longer axis to `size` and keep modules square.
+    `size` is the bounding-box dimension. The longer axis fills `size` and
+    modules stay square (no stretching) when the symbol is rectangular.
+
+    `shape` is one of "any" (default — encoder picks the smallest-area
+    symbol), "square", or "rectangular". Both shapes are valid for GS1
+    Data Matrix per GS1 General Specifications.
     """
 
     type: Literal["datamatrix", "gs1_datamatrix", "gs1-datamatrix"]
@@ -135,6 +138,7 @@ class DataMatrixElement(TypedDict, total=False):
     y: float
     size: float
     value: str
+    shape: Literal["any", "square", "rectangular"]
     color: Color  # foreground (dark modules)
     background: Color  # background (light modules)
 

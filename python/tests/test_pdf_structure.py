@@ -325,6 +325,52 @@ class TestBarcodes:
         with pytest.raises(rupdf.RupdfError):
             rupdf.render_pdf(doc)
 
+    def test_gs1_datamatrix_square_shape(self, font_path):
+        """shape='square' forces a square GS1 DataMatrix."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1_datamatrix", "x": 72, "y": 72, "size": 80,
+                     "value": "(10)BATCH(01)12345678901234",
+                     "shape": "square"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        pdf = rupdf.render_pdf(doc)
+        assert pdf.startswith(b"%PDF-")
+
+    def test_gs1_datamatrix_rectangular_shape(self, font_path):
+        """shape='rectangular' forces a rectangular symbol."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1_datamatrix", "x": 72, "y": 72, "size": 80,
+                     "value": "(01)12345678901234",
+                     "shape": "rectangular"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        pdf = rupdf.render_pdf(doc)
+        assert pdf.startswith(b"%PDF-")
+
+    def test_datamatrix_invalid_shape(self, font_path):
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "datamatrix", "x": 72, "y": 72, "size": 80,
+                     "value": "HELLO", "shape": "triangular"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        with pytest.raises(rupdf.RupdfError):
+            rupdf.render_pdf(doc)
+
     def test_datamatrix_custom_colors(self, font_path):
         """Data Matrix honors color + background."""
         doc = {

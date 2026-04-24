@@ -840,10 +840,13 @@ impl<'a> PdfGenerator<'a> {
             }
         };
         let is_gs1 = matches!(dm.kind, DataMatrixKind::Gs1);
+        let shape = rubar_core::DataMatrixShape::from(dm.shape);
 
-        let geometry = encode_datamatrix(&payload, is_gs1).map_err(|e| RupdfError::InvalidBarcode {
-            value: dm.value.clone(),
-            reason: e.to_string(),
+        let geometry = encode_datamatrix(&payload, is_gs1, shape).map_err(|e| {
+            RupdfError::InvalidBarcode {
+                value: dm.value.clone(),
+                reason: e.to_string(),
+            }
         })?;
 
         self.render_matrix(
