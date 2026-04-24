@@ -412,6 +412,29 @@ def build_document(fonts: dict, images: dict) -> dict:
     })
     y += 90
 
+    # GS1-128 barcode (Code 128 with FNC1 + Application Identifiers)
+    elements_page1.append({
+        "type": "gs1_128",
+        "x": MARGIN,
+        "y": y,
+        "w": 300,
+        "h": 60,
+        "value": "(01)12345678901234(17)260101(10)BATCH123",
+        "human_readable": True,
+        "font": default_font,
+        "font_size": 9,
+    })
+    elements_page1.append({
+        "type": "text",
+        "x": MARGIN,
+        "y": y + 65,
+        "text": "GS1-128 with GTIN, expiry, and batch",
+        "font": default_font,
+        "size": 9,
+        "color": (0, 0, 0, 255),
+    })
+    y += 90
+
     # --- QR CODE SECTION ---
     elements_page1.append({
         "type": "text",

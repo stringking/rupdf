@@ -1,6 +1,7 @@
 use crate::error::{Result, RupdfError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
+use pyo3::Borrowed;
 use std::collections::HashMap;
 
 /// RGBA color with values 0-255
@@ -37,9 +38,10 @@ impl Color {
     }
 }
 
-impl<'source> FromPyObject<'source> for Color {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
-        let tuple = ob.downcast::<PyTuple>()?;
+impl<'py> FromPyObject<'_, 'py> for Color {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
+        let tuple = ob.cast::<PyTuple>()?;
         if tuple.len() != 4 {
             return Err(pyo3::exceptions::PyValueError::new_err(
                 "Color must be a 4-tuple (r, g, b, a)",
@@ -63,8 +65,9 @@ pub enum TextAlign {
     Right,
 }
 
-impl<'source> FromPyObject<'source> for TextAlign {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for TextAlign {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let s: String = ob.extract()?;
         match s.as_str() {
             "left" => Ok(TextAlign::Left),
@@ -87,8 +90,9 @@ pub enum VerticalAnchor {
     Center,    // y is the midpoint between baseline and capline
 }
 
-impl<'source> FromPyObject<'source> for VerticalAnchor {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for VerticalAnchor {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let s: String = ob.extract()?;
         match s.as_str() {
             "baseline" => Ok(VerticalAnchor::Baseline),
@@ -111,8 +115,9 @@ pub enum BoxAlignX {
     Right,  // x is right edge of box
 }
 
-impl<'source> FromPyObject<'source> for BoxAlignX {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for BoxAlignX {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let s: String = ob.extract()?;
         match s.as_str() {
             "left" => Ok(BoxAlignX::Left),
@@ -135,8 +140,9 @@ pub enum BoxAlignY {
     Bottom, // y is bottom edge of box
 }
 
-impl<'source> FromPyObject<'source> for BoxAlignY {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for BoxAlignY {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let s: String = ob.extract()?;
         match s.as_str() {
             "top" => Ok(BoxAlignY::Top),
@@ -161,8 +167,9 @@ pub enum TextAlignY {
     Bottom,   // descender of last line at box bottom
 }
 
-impl<'source> FromPyObject<'source> for TextAlignY {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for TextAlignY {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let s: String = ob.extract()?;
         match s.as_str() {
             "top" => Ok(TextAlignY::Top),
@@ -226,9 +233,20 @@ pub struct ImageElement {
     pub align: TextAlign,  // Horizontal alignment: left (default), center, right
 }
 
-/// Barcode element (Code 128)
+/// Barcode flavour
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BarcodeKind {
+    /// Plain Code 128 (any printable ASCII payload)
+    Code128,
+    /// GS1-128: Code 128 with FNC1 designator and Application Identifiers.
+    /// `value` is a parenthesized string like `(01)12345678901234(10)BATCH`.
+    Gs1_128,
+}
+
+/// Barcode element (Code 128 / GS1-128)
 #[derive(Debug, Clone)]
 pub struct BarcodeElement {
+    pub kind: BarcodeKind,
     pub x: f32,
     pub y: f32,
     pub w: f32,
@@ -330,25 +348,26 @@ pub struct Document {
 
 // Parsing helpers
 
-fn get_optional<'py, T: FromPyObject<'py>>(
-    dict: &'py PyDict,
-    key: &str,
-) -> PyResult<Option<T>> {
-    match dict.get_item(key) {
-        Some(val) if !val.is_none() => Ok(Some(val.extract()?)),
+fn get_optional<'py, T>(dict: &Bound<'py, PyDict>, key: &str) -> PyResult<Option<T>>
+where
+    for<'a> T: FromPyObject<'a, 'py>,
+{
+    match dict.get_item(key)? {
+        Some(val) if !val.is_none() => Ok(Some(val.extract().map_err(Into::into)?)),
         _ => Ok(None),
     }
 }
 
-fn get_required<'py, T: FromPyObject<'py>>(
-    dict: &'py PyDict,
-    key: &str,
-) -> PyResult<T> {
-    dict.get_item(key)
+fn get_required<'py, T>(dict: &Bound<'py, PyDict>, key: &str) -> PyResult<T>
+where
+    for<'a> T: FromPyObject<'a, 'py>,
+{
+    dict.get_item(key)?
         .ok_or_else(|| {
             pyo3::exceptions::PyKeyError::new_err(format!("Missing required key: '{}'", key))
         })?
         .extract()
+        .map_err(Into::into)
 }
 
 /// Convert PyResult to our Result, wrapping errors in InvalidDocument
@@ -357,22 +376,34 @@ fn to_doc_err<T>(result: PyResult<T>) -> Result<T> {
 }
 
 /// Get a required field from dict, returning InvalidDocument error on failure
-fn req<'py, T: FromPyObject<'py>>(dict: &'py PyDict, key: &str) -> Result<T> {
+fn req<'py, T>(dict: &Bound<'py, PyDict>, key: &str) -> Result<T>
+where
+    for<'a> T: FromPyObject<'a, 'py>,
+{
     to_doc_err(get_required(dict, key))
 }
 
 /// Get an optional field from dict with a default value
-fn opt_or<'py, T: FromPyObject<'py>>(dict: &'py PyDict, key: &str, default: T) -> Result<T> {
+fn opt_or<'py, T>(dict: &Bound<'py, PyDict>, key: &str, default: T) -> Result<T>
+where
+    for<'a> T: FromPyObject<'a, 'py>,
+{
     to_doc_err(get_optional(dict, key)).map(|o| o.unwrap_or(default))
 }
 
 /// Get an optional field from dict with Default::default()
-fn opt_default<'py, T: FromPyObject<'py> + Default>(dict: &'py PyDict, key: &str) -> Result<T> {
+fn opt_default<'py, T>(dict: &Bound<'py, PyDict>, key: &str) -> Result<T>
+where
+    for<'a> T: FromPyObject<'a, 'py> + Default,
+{
     to_doc_err(get_optional(dict, key)).map(|o| o.unwrap_or_default())
 }
 
 /// Get an optional field from dict
-fn opt<'py, T: FromPyObject<'py>>(dict: &'py PyDict, key: &str) -> Result<Option<T>> {
+fn opt<'py, T>(dict: &Bound<'py, PyDict>, key: &str) -> Result<Option<T>>
+where
+    for<'a> T: FromPyObject<'a, 'py>,
+{
     to_doc_err(get_optional(dict, key))
 }
 
@@ -385,11 +416,11 @@ fn with_element_context<T>(result: Result<T>, index: usize) -> Result<T> {
 
 impl Element {
     #[allow(dead_code)]
-    pub fn from_py(dict: &PyDict) -> Result<Self> {
+    pub fn from_py<'py>(dict: &Bound<'py, PyDict>) -> Result<Self> {
         Self::from_py_indexed(dict, 0)
     }
 
-    pub fn from_py_indexed(dict: &PyDict, index: usize) -> Result<Self> {
+    pub fn from_py_indexed<'py>(dict: &Bound<'py, PyDict>, index: usize) -> Result<Self> {
         let element_type: String = with_element_context(req(dict, "type"), index)?;
 
         match element_type.as_str() {
@@ -461,16 +492,23 @@ impl Element {
                 }))
             }
 
-            "barcode" | "barcode128" => Ok(Element::Barcode(BarcodeElement {
-                x: with_element_context(req(dict, "x"), index)?,
-                y: with_element_context(req(dict, "y"), index)?,
-                w: with_element_context(req(dict, "w"), index)?,
-                h: with_element_context(req(dict, "h"), index)?,
-                value: with_element_context(req(dict, "value"), index)?,
-                human_readable: with_element_context(opt_or(dict, "human_readable", false), index)?,
-                font: with_element_context(opt_or(dict, "font", "mono".to_string()), index)?,
-                font_size: with_element_context(opt_or(dict, "font_size", 10.0), index)?,
-            })),
+            "barcode" | "barcode128" | "gs1_128" | "gs1-128" | "gs1" => {
+                let kind = match element_type.as_str() {
+                    "gs1_128" | "gs1-128" | "gs1" => BarcodeKind::Gs1_128,
+                    _ => BarcodeKind::Code128,
+                };
+                Ok(Element::Barcode(BarcodeElement {
+                    kind,
+                    x: with_element_context(req(dict, "x"), index)?,
+                    y: with_element_context(req(dict, "y"), index)?,
+                    w: with_element_context(req(dict, "w"), index)?,
+                    h: with_element_context(req(dict, "h"), index)?,
+                    value: with_element_context(req(dict, "value"), index)?,
+                    human_readable: with_element_context(opt_or(dict, "human_readable", false), index)?,
+                    font: with_element_context(opt_or(dict, "font", "mono".to_string()), index)?,
+                    font_size: with_element_context(opt_or(dict, "font_size", 10.0), index)?,
+                }))
+            }
 
             "qrcode" | "qr" => Ok(Element::QRCode(QRCodeElement {
                 x: with_element_context(req(dict, "x"), index)?,
@@ -487,7 +525,7 @@ impl Element {
 }
 
 impl Page {
-    pub fn from_py(dict: &PyDict) -> Result<Self> {
+    pub fn from_py<'py>(dict: &Bound<'py, PyDict>) -> Result<Self> {
         let size: (f32, f32) = req(dict, "size")?;
 
         if size.0 <= 0.0 || size.1 <= 0.0 {
@@ -498,12 +536,12 @@ impl Page {
         }
 
         let background = opt_or(dict, "background", Color::white())?;
-        let elements_list: Option<&PyList> = opt(dict, "elements")?;
+        let elements_list: Option<Bound<'py, PyList>> = opt(dict, "elements")?;
 
         let mut elements = Vec::new();
         if let Some(list) = elements_list {
             for (i, item) in list.iter().enumerate() {
-                let elem_dict = item.downcast::<PyDict>()
+                let elem_dict = item.cast::<PyDict>()
                     .map_err(|_| RupdfError::InvalidDocument(format!("Element {} must be a dict", i)))?;
                 elements.push(Element::from_py_indexed(elem_dict, i)?);
             }
@@ -519,7 +557,7 @@ impl Page {
 }
 
 impl Metadata {
-    pub fn from_py(dict: &PyDict) -> Result<Self> {
+    pub fn from_py<'py>(dict: &Bound<'py, PyDict>) -> Result<Self> {
         Ok(Self {
             title: opt(dict, "title")?,
             author: opt(dict, "author")?,
@@ -531,19 +569,19 @@ impl Metadata {
 }
 
 impl Resources {
-    pub fn from_py(dict: &PyDict) -> Result<Self> {
+    pub fn from_py<'py>(dict: &Bound<'py, PyDict>) -> Result<Self> {
         let mut resources = Self::default();
 
         // Parse fonts
-        if let Some(fonts_dict) = opt::<&PyDict>(dict, "fonts")? {
+        if let Some(fonts_dict) = opt::<Bound<'py, PyDict>>(dict, "fonts")? {
             for (key, value) in fonts_dict.iter() {
                 let name: String = key.extract()
                     .map_err(|e| RupdfError::InvalidDocument(format!("Font key must be string: {}", e)))?;
-                let font_dict = value.downcast::<PyDict>()
+                let font_dict = value.cast::<PyDict>()
                     .map_err(|_| RupdfError::InvalidDocument("Font value must be a dict".to_string()))?;
 
                 let path: Option<String> = opt(font_dict, "path")?;
-                let bytes: Option<&PyBytes> = opt(font_dict, "bytes")?;
+                let bytes: Option<Bound<'py, PyBytes>> = opt(font_dict, "bytes")?;
 
                 let source = match (path, bytes) {
                     (Some(p), None) => FontSource::Path(p),
@@ -564,15 +602,15 @@ impl Resources {
         }
 
         // Parse images
-        if let Some(images_dict) = opt::<&PyDict>(dict, "images")? {
+        if let Some(images_dict) = opt::<Bound<'py, PyDict>>(dict, "images")? {
             for (key, value) in images_dict.iter() {
                 let name: String = key.extract()
                     .map_err(|e| RupdfError::InvalidDocument(format!("Image key must be string: {}", e)))?;
-                let image_dict = value.downcast::<PyDict>()
+                let image_dict = value.cast::<PyDict>()
                     .map_err(|_| RupdfError::InvalidDocument("Image value must be a dict".to_string()))?;
 
                 let path: Option<String> = opt(image_dict, "path")?;
-                let bytes: Option<&PyBytes> = opt(image_dict, "bytes")?;
+                let bytes: Option<Bound<'py, PyBytes>> = opt(image_dict, "bytes")?;
 
                 let source = match (path, bytes) {
                     (Some(p), None) => ImageSource::Path(p),
@@ -597,25 +635,25 @@ impl Resources {
 }
 
 impl Document {
-    pub fn from_py(dict: &PyDict) -> Result<Self> {
+    pub fn from_py<'py>(dict: &Bound<'py, PyDict>) -> Result<Self> {
         // Parse metadata (optional)
-        let metadata = match opt::<&PyDict>(dict, "metadata")? {
-            Some(meta_dict) => Metadata::from_py(meta_dict)?,
+        let metadata = match opt::<Bound<'py, PyDict>>(dict, "metadata")? {
+            Some(meta_dict) => Metadata::from_py(&meta_dict)?,
             None => Metadata::default(),
         };
 
         // Parse pages (required)
-        let pages_list: &PyList = req(dict, "pages")?;
+        let pages_list: Bound<'py, PyList> = req(dict, "pages")?;
         let mut pages = Vec::with_capacity(pages_list.len());
         for (i, item) in pages_list.iter().enumerate() {
-            let page_dict = item.downcast::<PyDict>()
+            let page_dict = item.cast::<PyDict>()
                 .map_err(|_| RupdfError::InvalidDocument(format!("Page {} must be a dict", i)))?;
             pages.push(Page::from_py(page_dict)?);
         }
 
         // Parse resources (optional)
-        let resources = match opt::<&PyDict>(dict, "resources")? {
-            Some(res_dict) => Resources::from_py(res_dict)?,
+        let resources = match opt::<Bound<'py, PyDict>>(dict, "resources")? {
+            Some(res_dict) => Resources::from_py(&res_dict)?,
             None => Resources::default(),
         };
 

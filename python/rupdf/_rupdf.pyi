@@ -88,6 +88,25 @@ class BarcodeElement(TypedDict, total=False):
     font_size: float
 
 
+class GS1_128Element(TypedDict, total=False):
+    """GS1-128 barcode (Code 128 with FNC1 designator and Application Identifiers).
+
+    `value` is a parenthesized AI string, e.g. "(01)12345678901234(17)260101(10)BATCH123".
+    Fixed-length AIs (00, 01-04, 11-19, 20, 31xx-36xx, 41) are validated; FNC1
+    separators are inserted automatically after variable-length fields.
+    """
+
+    type: Literal["gs1_128", "gs1-128", "gs1"]
+    x: float
+    y: float
+    w: float
+    h: float
+    value: str
+    human_readable: bool
+    font: str
+    font_size: float
+
+
 class QRCodeElement(TypedDict, total=False):
     type: Literal["qrcode", "qr"]
     x: float
@@ -105,6 +124,7 @@ Element = Union[
     LineElement,
     ImageElement,
     BarcodeElement,
+    GS1_128Element,
     QRCodeElement,
 ]
 

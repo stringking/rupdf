@@ -219,6 +219,67 @@ class TestBarcodes:
         pdf = rupdf.render_pdf(doc)
         assert len(pdf) > 0
 
+    def test_gs1_128_basic(self, font_path):
+        """GS1-128 with parenthesized AI string should render."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1_128", "x": 72, "y": 72, "w": 250, "h": 50,
+                     "value": "(01)12345678901234(17)260101(10)BATCH123"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        pdf = rupdf.render_pdf(doc)
+        assert pdf.startswith(b"%PDF-")
+
+    def test_gs1_128_with_human_readable(self, font_path):
+        """GS1-128 with human_readable text uses the parenthesized form."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1-128", "x": 72, "y": 72, "w": 250, "h": 60,
+                     "value": "(01)12345678901234(10)ABC", "human_readable": True,
+                     "font": "f", "font_size": 9}
+                ]
+            }],
+            "resources": {"fonts": {"f": {"path": font_path}}},
+        }
+        pdf = rupdf.render_pdf(doc)
+        assert pdf.startswith(b"%PDF-")
+
+    def test_gs1_128_rejects_malformed(self, font_path):
+        """Missing opening paren should raise."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1_128", "x": 72, "y": 72, "w": 250, "h": 50,
+                     "value": "01)12345678901234"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        with pytest.raises(rupdf.RupdfError):
+            rupdf.render_pdf(doc)
+
+    def test_gs1_128_rejects_wrong_fixed_length(self, font_path):
+        """AI 01 requires exactly 14 digits."""
+        doc = {
+            "pages": [{
+                "size": (612, 792),
+                "elements": [
+                    {"type": "gs1_128", "x": 72, "y": 72, "w": 250, "h": 50,
+                     "value": "(01)123"}
+                ]
+            }],
+            "resources": {"fonts": {}},
+        }
+        with pytest.raises(rupdf.RupdfError):
+            rupdf.render_pdf(doc)
+
 
 class TestPageDimensions:
     """Test page dimension handling."""

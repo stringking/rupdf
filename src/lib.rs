@@ -24,7 +24,11 @@ use types::Document;
 ///     RupdfError: If rendering fails
 #[pyfunction]
 #[pyo3(signature = (document, compress = true))]
-fn render_pdf<'py>(py: Python<'py>, document: &'py PyDict, compress: bool) -> PyResult<&'py PyBytes> {
+fn render_pdf<'py>(
+    py: Python<'py>,
+    document: &Bound<'py, PyDict>,
+    compress: bool,
+) -> PyResult<Bound<'py, PyBytes>> {
     // Parse document from Python dict
     let doc = Document::from_py(document).map_err(PyErr::from)?;
 
@@ -40,7 +44,7 @@ fn render_pdf<'py>(py: Python<'py>, document: &'py PyDict, compress: bool) -> Py
 
 /// The rupdf Python module
 #[pymodule]
-fn _rupdf(py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn _rupdf(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render_pdf, m)?)?;
     m.add("RupdfError", py.get_type::<PyRupdfError>())?;
     Ok(())

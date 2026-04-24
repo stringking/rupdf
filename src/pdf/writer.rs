@@ -63,7 +63,16 @@ impl<'a> PdfGenerator<'a> {
                         let embedder = font_embedders
                             .entry(b.font.clone())
                             .or_insert_with(|| FontEmbedder::new(font, &b.font));
-                        embedder.use_text(&b.value)?;
+                        // For GS1-128, the human-readable text is the parenthesized
+                        // form, which adds '(' and ')' glyphs not present in `value`.
+                        let hr_text = match b.kind {
+                            crate::types::BarcodeKind::Gs1_128 => {
+                                let fields = crate::elements::barcode::parse_gs1_value(&b.value)?;
+                                crate::elements::barcode::format_human_readable(&fields)
+                            }
+                            crate::types::BarcodeKind::Code128 => b.value.clone(),
+                        };
+                        embedder.use_text(&hr_text)?;
                     }
                     Element::Image(img) => {
                         // Check image type to determine tracking strategy
@@ -695,19 +704,30 @@ impl<'a> PdfGenerator<'a> {
         _alpha_states: &HashMap<u8, Ref>,
     ) -> Result<()> {
         use barcoders::sym::code128::Code128;
+        use crate::elements::barcode as gs1;
+        use crate::types::BarcodeKind;
 
         // Save state to isolate graphics state changes
         content.save_state();
 
-        // Code128 requires a character-set prefix:
-        // \u{00C0} (À) = character-set A (uppercase, control chars)
-        // \u{0181} (Ɓ) = character-set B (upper/lowercase, punctuation)
-        // \u{0106} (Ć) = character-set C (numeric pairs)
-        // Use character-set B as default for general alphanumeric data
-        let prefixed_value = format!("\u{0181}{}", barcode.value);
+        // Build the barcoders input. For plain Code 128 we always use character-set B
+        // (\u{0181}) as the prefix. For GS1-128 we parse the (AI)data syntax and
+        // construct a Code-B start + FNC1 sequence with FNC1 separators between
+        // variable-length fields.
+        //
+        // barcoders character-set prefixes:
+        //   \u{00C0} (À) = set A   \u{0181} (Ɓ) = set B   \u{0106} (Ć) = set C
+        // FNC1 = \u{0179}
+        let (encode_input, human_readable_text) = match barcode.kind {
+            BarcodeKind::Code128 => (format!("\u{0181}{}", barcode.value), barcode.value.clone()),
+            BarcodeKind::Gs1_128 => {
+                let fields = gs1::parse_gs1_value(&barcode.value)?;
+                (gs1::build_code128_input(&fields), gs1::format_human_readable(&fields))
+            }
+        };
 
         // Generate barcode
-        let code = Code128::new(&prefixed_value).map_err(|e| RupdfError::InvalidBarcode {
+        let code = Code128::new(&encode_input).map_err(|e| RupdfError::InvalidBarcode {
             value: barcode.value.clone(),
             reason: format!("{:?}", e),
         })?;
@@ -748,7 +768,7 @@ impl<'a> PdfGenerator<'a> {
             let ps_name = alias_to_ps.get(&barcode.font)
                 .expect("barcode font alias was collected in first pass");
 
-            let text_width = font.text_width(&barcode.value, barcode.font_size, &barcode.font)?;
+            let text_width = font.text_width(&human_readable_text, barcode.font_size, &barcode.font)?;
             let text_x = barcode.x + (barcode.w - text_width) / 2.0;
 
             // Position text below barcode
@@ -758,7 +778,7 @@ impl<'a> PdfGenerator<'a> {
             content.begin_text();
             content.set_font(Name(ps_name.as_bytes()), barcode.font_size);
             content.next_line(text_x, text_y);
-            let encoded_text = embedder.encode_text(&barcode.value);
+            let encoded_text = embedder.encode_text(&human_readable_text);
             content.show(Str(&encoded_text));
             content.end_text();
         }

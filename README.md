@@ -8,7 +8,7 @@ A fast, minimal PDF renderer in Rust with Python bindings. Takes pre-laid-out pa
 - **Rectangles** with stroke, fill, and rounded corners
 - **Lines** with configurable width
 - **Images** (PNG, JPEG, WebP, SVG)
-- **Barcodes** (Code 128) and **QR codes**
+- **Barcodes** (Code 128, GS1-128) and **QR codes**
 - **Font subsetting** - embeds only used glyphs
 - **Compression** - optional zlib compression
 
@@ -223,6 +223,27 @@ Supported formats: PNG, JPEG, WebP (rasterized to 300 DPI), SVG (rendered as vec
     "human_readable": True,  # Show text below barcode
     "font": "font_ref",      # Required if human_readable
     "font_size": 10
+}
+```
+
+### GS1-128
+
+A Code 128 variant with an FNC1 designator and Application Identifiers (AIs).
+The `value` is a parenthesized string; FNC1 separators are inserted automatically
+after variable-length fields, and fixed-length AIs (00, 01-04, 11-19, 20,
+31xx-36xx, 41) have their data length validated.
+
+```python
+{
+    "type": "gs1_128",       # also "gs1-128" or "gs1"
+    "x": 72,
+    "y": 72,
+    "w": 300,
+    "h": 60,
+    "value": "(01)12345678901234(17)260101(10)BATCH123",
+    "human_readable": True,  # renders the parenthesized form below the bars
+    "font": "font_ref",
+    "font_size": 9
 }
 ```
 
