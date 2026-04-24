@@ -67,8 +67,12 @@ impl<'a> PdfGenerator<'a> {
                         // form, which adds '(' and ')' glyphs not present in `value`.
                         let hr_text = match b.kind {
                             crate::types::BarcodeKind::Gs1_128 => {
-                                let fields = crate::elements::barcode::parse_gs1_value(&b.value)?;
-                                crate::elements::barcode::format_human_readable(&fields)
+                                let fields = rubar_core::gs1::parse(&b.value)
+                                    .map_err(|e| RupdfError::InvalidBarcode {
+                                        value: b.value.clone(),
+                                        reason: e.to_string(),
+                                    })?;
+                                rubar_core::gs1::format_human_readable(&fields)
                             }
                             crate::types::BarcodeKind::Code128 => b.value.clone(),
                         };
@@ -703,36 +707,36 @@ impl<'a> PdfGenerator<'a> {
         alias_to_ps: &HashMap<String, String>,
         _alpha_states: &HashMap<u8, Ref>,
     ) -> Result<()> {
-        use barcoders::sym::code128::Code128;
-        use crate::elements::barcode as gs1;
         use crate::types::BarcodeKind;
+        use rubar_core::{encode_code128, gs1, Code128Symbol};
 
         // Save state to isolate graphics state changes
         content.save_state();
 
-        // Build the barcoders input. For plain Code 128 we always use character-set B
-        // (\u{0181}) as the prefix. For GS1-128 we parse the (AI)data syntax and
-        // construct a Code-B start + FNC1 sequence with FNC1 separators between
-        // variable-length fields.
-        //
-        // barcoders character-set prefixes:
-        //   \u{00C0} (À) = set A   \u{0181} (Ɓ) = set B   \u{0106} (Ć) = set C
-        // FNC1 = \u{0179}
-        let (encode_input, human_readable_text) = match barcode.kind {
-            BarcodeKind::Code128 => (format!("\u{0181}{}", barcode.value), barcode.value.clone()),
+        let (symbols, human_readable_text) = match barcode.kind {
+            BarcodeKind::Code128 => {
+                // Plain Code 128 with Code-B start: a single Data symbol is enough
+                // — rubar_core::encode_code128 auto-inserts Code-B when no start
+                // symbol is specified.
+                (
+                    vec![Code128Symbol::Data(barcode.value.clone())],
+                    barcode.value.clone(),
+                )
+            }
             BarcodeKind::Gs1_128 => {
-                let fields = gs1::parse_gs1_value(&barcode.value)?;
-                (gs1::build_code128_input(&fields), gs1::format_human_readable(&fields))
+                let fields = gs1::parse(&barcode.value)
+                    .map_err(|e| RupdfError::InvalidBarcode {
+                        value: barcode.value.clone(),
+                        reason: e.to_string(),
+                    })?;
+                (gs1::to_symbols(&fields), gs1::format_human_readable(&fields))
             }
         };
 
-        // Generate barcode
-        let code = Code128::new(&encode_input).map_err(|e| RupdfError::InvalidBarcode {
+        let geometry = encode_code128(&symbols).map_err(|e| RupdfError::InvalidBarcode {
             value: barcode.value.clone(),
-            reason: format!("{:?}", e),
+            reason: e.to_string(),
         })?;
-
-        let encoded = code.encode();
 
         // Calculate bar dimensions
         let bar_height = if barcode.human_readable {
@@ -741,8 +745,7 @@ impl<'a> PdfGenerator<'a> {
             barcode.h
         };
 
-        let total_modules: usize = encoded.len();
-        let module_width = barcode.w / total_modules as f32;
+        let module_width = barcode.w / geometry.total_modules as f32;
 
         // Convert y to PDF coordinates
         let bar_top_y = page_height - barcode.y;
@@ -751,13 +754,11 @@ impl<'a> PdfGenerator<'a> {
         // Draw bars
         content.set_fill_rgb(0.0, 0.0, 0.0);
 
-        let mut x = barcode.x;
-        for &module in &encoded {
-            if module == 1 {
-                content.rect(x, bar_bottom_y, module_width, bar_height);
-                content.fill_nonzero();
-            }
-            x += module_width;
+        for bar in &geometry.bars {
+            let x = barcode.x + bar.x as f32 * module_width;
+            let width = bar.width as f32 * module_width;
+            content.rect(x, bar_bottom_y, width, bar_height);
+            content.fill_nonzero();
         }
 
         // Draw human readable text
@@ -795,34 +796,23 @@ impl<'a> PdfGenerator<'a> {
         page_height: f32,
         alpha_states: &HashMap<u8, Ref>,
     ) -> Result<()> {
-        use qrcode::QrCode;
+        use rubar_core::encode_qr;
 
         // Save state to isolate graphics state changes
         content.save_state();
 
-        // Generate QR code
-        let code = QrCode::new(qr.value.as_bytes()).map_err(|e| RupdfError::InvalidBarcode {
+        let geometry = encode_qr(&qr.value).map_err(|e| RupdfError::InvalidBarcode {
             value: qr.value.clone(),
-            reason: format!("QR code generation failed: {}", e),
+            reason: e.to_string(),
         })?;
 
-        let matrix = code.render::<char>()
-            .quiet_zone(false)
-            .module_dimensions(1, 1)
-            .build();
-
-        // Parse the matrix to get dimensions
-        let lines: Vec<&str> = matrix.lines().collect();
-        let qr_height = lines.len();
-        let qr_width = if qr_height > 0 { lines[0].chars().count() } else { 0 };
-
-        if qr_width == 0 || qr_height == 0 {
+        if geometry.size == 0 {
             content.restore_state();
             return Ok(());
         }
 
         // Calculate module size
-        let module_size = qr.size / qr_width.max(qr_height) as f32;
+        let module_size = qr.size / geometry.size as f32;
 
         // Convert to PDF coordinates
         let qr_top_y = page_height - qr.y;
@@ -847,10 +837,10 @@ impl<'a> PdfGenerator<'a> {
         let (r, g, b) = qr.color.to_rgb_floats();
         content.set_fill_rgb(r, g, b);
 
-        // Draw dark modules
-        for (row, line) in lines.iter().enumerate() {
-            for (col, ch) in line.chars().enumerate() {
-                if ch == '█' || ch == '▀' || ch == '▄' || ch == '#' {
+        // Draw dark modules from the bool matrix
+        for (row, line) in geometry.modules.iter().enumerate() {
+            for (col, &dark) in line.iter().enumerate() {
+                if dark {
                     let x = qr.x + col as f32 * module_size;
                     let y = qr_top_y - (row + 1) as f32 * module_size;
                     content.rect(x, y, module_size, module_size);

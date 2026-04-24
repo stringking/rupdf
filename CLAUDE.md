@@ -88,6 +88,5 @@ python scripts/generate_test_pdf.py --svg image.svg --png image.png
 | subsetter | Font subsetting |
 | image | Raster image decoding |
 | resvg/usvg | SVG parsing and rendering |
-| barcoders | Code 128 barcodes |
-| qrcode | QR code generation |
+| rubar-core | Barcode encoding (Code 128, GS1-128, QR) — pure-Rust core of the rubar project |
 | miniz_oxide | Zlib compression |
