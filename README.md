@@ -5,6 +5,7 @@ A fast, minimal PDF renderer in Rust with Python bindings. Takes pre-laid-out pa
 ## Features
 
 - **Text** with TTF/OTF fonts, horizontal/vertical alignment, and colors
+- **Font fallback chains** — per-element list of fallback fonts for characters absent from the primary font's cmap (emoji, CJK, Arabic, etc.)
 - **Rectangles** with stroke, fill, and rounded corners
 - **Lines** with configurable width
 - **Images** (PNG, JPEG, WebP, SVG)
@@ -96,6 +97,8 @@ Common page sizes:
     "y": 72,
     "text": "Hello",
     "font": "font_ref",           # Reference to fonts in resources
+    "font_fallback": [],          # Optional list of fallback font refs; see "Font fallback" below
+    "missing_glyph_policy": "drop",  # "drop" (default) or "raise"
     "size": 12,                   # Font size in points
     "color": (0, 0, 0, 255),      # RGBA (optional, default black)
     "align": "left",              # "left", "center", or "right" (optional)
@@ -127,6 +130,8 @@ Multi-line text with word wrapping, like Illustrator's "area type".
     "h": 100,
     "text": "Long text that will wrap within the box...",
     "font": "font_ref",
+    "font_fallback": [],          # Optional list of fallback font refs; see "Font fallback" below
+    "missing_glyph_policy": "drop",  # "drop" (default) or "raise"
     "size": 12,
     "line_height": 14.4,          # Optional, default = size * 1.2
     "color": (0, 0, 0, 255),      # Optional, default black
@@ -160,6 +165,51 @@ Multi-line text with word wrapping, like Illustrator's "area type".
 - Text wraps at word boundaries to fit within `w`
 - Overflow is clipped to box bounds
 - Explicit `\n` in text creates line breaks
+
+### Font fallback
+
+Text and TextBox elements accept a `font_fallback` list of font aliases tried in order for any character the primary font's cmap doesn't cover. This is how you render emoji, CJK, Arabic, or any script outside your primary font's coverage without crashing or showing tofu.
+
+```python
+doc = {
+    "pages": [{
+        "size": (612, 792),
+        "elements": [
+            {
+                "type": "text",
+                "x": 72, "y": 72,
+                "text": "Tony ❤ 山田",
+                "font": "body",
+                "font_fallback": ["emoji", "body_jp"],
+                "size": 12,
+            },
+        ],
+    }],
+    "resources": {
+        "fonts": {
+            "body":     {"path": "IBMPlexSans-Regular.otf"},
+            "emoji":    {"path": "NotoEmoji-Regular.ttf"},
+            "body_jp":  {"path": "IBMPlexSansJP-Regular.otf"},
+        },
+    },
+}
+```
+
+**Semantics:**
+
+- For each character, rupdf walks `[font, *font_fallback]` and uses the first font whose cmap covers it.
+- The **primary** font drives line height, ascender, descender, baseline, and cap-height metrics. Fallback chars share that baseline so they don't shift layout.
+- Inside one text element, the PDF content stream switches fonts inline (via `Tf`) at each run boundary. Word-wrapping in TextBox honors per-character advances across fonts.
+- Fallback fonts not referenced by any character are not embedded.
+
+**`missing_glyph_policy`** controls what happens when *no* font in the chain covers a character:
+
+| Value | Behavior |
+| --- | --- |
+| `"drop"` (default) | Character silently omitted. Surrounding spaces and layout are preserved. |
+| `"raise"` | `RupdfError` is raised, naming the primary font and the offending codepoint. |
+
+`"drop"` is the right default for user-supplied text (customer names, free-text fields) where rendering must not fail. Use `"raise"` in tests or pipelines that want to detect unsupported codepoints early.
 
 ### Rectangle
 

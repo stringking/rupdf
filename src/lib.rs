@@ -2,6 +2,7 @@ mod elements;
 mod error;
 mod pdf;
 mod resources;
+mod runs;
 mod types;
 
 use error::PyRupdfError;

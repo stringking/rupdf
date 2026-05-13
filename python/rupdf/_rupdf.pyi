@@ -13,12 +13,21 @@ VerticalAnchor = Literal["baseline", "capline", "center"]
 TextAlignY = Literal["top", "capline", "center", "baseline", "bottom"]
 
 
+MissingGlyphPolicy = Literal["drop", "raise"]
+
+
 class TextElement(TypedDict, total=False):
     type: Literal["text"]
     x: float
     y: float
     text: str
     font: str
+    # Aliases of additional fonts in `resources.fonts`, tried in order for
+    # characters absent from the primary font's cmap. Primary font drives
+    # baseline / line-height / metrics; fallbacks contribute only glyphs.
+    font_fallback: List[str]
+    # Behavior when no font in the chain covers a character. Default "drop".
+    missing_glyph_policy: MissingGlyphPolicy
     size: float
     color: Color
     align: HAlign
@@ -35,6 +44,9 @@ class TextBoxElement(TypedDict, total=False):
     h: float
     text: str
     font: str
+    # See TextElement for fallback / policy semantics.
+    font_fallback: List[str]
+    missing_glyph_policy: MissingGlyphPolicy
     size: float
     line_height: float  # defaults to size * 1.2
     color: Color

@@ -88,28 +88,21 @@ impl LoadedFont {
         })
     }
 
-    /// Get glyph ID for a character, returns error if missing
-    pub fn glyph_id(&self, ch: char, font_name: &str) -> Result<u16> {
-        self.cmap.get(&ch).copied().ok_or_else(|| RupdfError::MissingGlyph {
-            glyph: ch,
-            font: font_name.to_string(),
-        })
+    /// Look up the glyph id for a character. Returns None if the font's cmap
+    /// does not cover it. This is the only cmap accessor; resolution policy
+    /// lives in `crate::runs`.
+    pub fn glyph_id_opt(&self, ch: char) -> Option<u16> {
+        self.cmap.get(&ch).copied()
     }
 
-    /// Get advance width for a glyph
+    /// Get advance width for a glyph (font em units).
     pub fn advance_width(&self, glyph_id: u16) -> u16 {
         self.glyph_widths.get(&glyph_id).copied().unwrap_or(0)
     }
 
-    /// Calculate text width in points
-    pub fn text_width(&self, text: &str, size: f32, font_name: &str) -> Result<f32> {
-        let scale = size / self.units_per_em as f32;
-        let mut width = 0.0;
-        for ch in text.chars() {
-            let glyph_id = self.glyph_id(ch, font_name)?;
-            width += self.advance_width(glyph_id) as f32 * scale;
-        }
-        Ok(width)
+    /// Advance width in points for a glyph at the given font size.
+    pub fn advance_pts(&self, glyph_id: u16, size: f32) -> f32 {
+        self.advance_width(glyph_id) as f32 * size / self.units_per_em as f32
     }
 
     /// Get ascender in points for given font size
@@ -125,54 +118,6 @@ impl LoadedFont {
     /// Get descender in points for given font size (returns negative value)
     pub fn descender_pts(&self, size: f32) -> f32 {
         self.descender as f32 * size / self.units_per_em as f32
-    }
-
-    /// Wrap text to fit within max_width, returning lines
-    pub fn wrap_text(&self, text: &str, size: f32, max_width: f32, font_name: &str) -> Result<Vec<String>> {
-        let mut lines = Vec::new();
-
-        for paragraph in text.split('\n') {
-            if paragraph.is_empty() {
-                lines.push(String::new());
-                continue;
-            }
-
-            let words: Vec<&str> = paragraph.split_whitespace().collect();
-            if words.is_empty() {
-                lines.push(String::new());
-                continue;
-            }
-
-            let mut current_line = String::new();
-            let mut current_width = 0.0;
-            let space_width = self.text_width(" ", size, font_name)?;
-
-            for word in words {
-                let word_width = self.text_width(word, size, font_name)?;
-
-                if current_line.is_empty() {
-                    // First word on line - always add it (even if too wide)
-                    current_line = word.to_string();
-                    current_width = word_width;
-                } else if current_width + space_width + word_width <= max_width {
-                    // Word fits
-                    current_line.push(' ');
-                    current_line.push_str(word);
-                    current_width += space_width + word_width;
-                } else {
-                    // Word doesn't fit - start new line
-                    lines.push(current_line);
-                    current_line = word.to_string();
-                    current_width = word_width;
-                }
-            }
-
-            if !current_line.is_empty() {
-                lines.push(current_line);
-            }
-        }
-
-        Ok(lines)
     }
 }
 

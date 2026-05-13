@@ -1,9 +1,56 @@
 use crate::error::{Result, RupdfError};
-use crate::pdf::FontEmbedder;
-use crate::resources::{LoadedImage, LoadedResources};
+use crate::pdf::{encode_glyphs, FontEmbedder};
+use crate::resources::{LoadedFont, LoadedImage, LoadedResources};
+use crate::runs::{self, ResolvedChar};
 use crate::types::*;
 use pdf_writer::{Content, Date, Filter, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
 use std::collections::HashMap;
+
+/// (alias, font) entries describing a primary-plus-fallback font chain.
+/// Tuple values are Copy because they hold borrowed references.
+type FontChain<'a> = Vec<(&'a str, &'a LoadedFont)>;
+
+fn build_chain<'a>(
+    resources: &'a LoadedResources,
+    primary: &'a str,
+    fallback: &'a [String],
+) -> Result<FontChain<'a>> {
+    let mut chain: FontChain<'a> = Vec::with_capacity(1 + fallback.len());
+    chain.push((primary, resources.get_font(primary)?));
+    for alias in fallback {
+        chain.push((alias.as_str(), resources.get_font(alias)?));
+    }
+    Ok(chain)
+}
+
+fn chain_fonts<'a>(chain: &FontChain<'a>) -> Vec<&'a LoadedFont> {
+    chain.iter().map(|(_, f)| *f).collect()
+}
+
+fn chain_aliases<'a>(chain: &FontChain<'a>) -> Vec<&'a str> {
+    chain.iter().map(|(n, _)| *n).collect()
+}
+
+/// Lazily create embedders for the fonts referenced by `resolved`, and
+/// register the (char, glyph_id) for each resolved char on its embedder.
+fn register_resolved_chars<'a>(
+    resolved: &[ResolvedChar],
+    chain: &FontChain<'a>,
+    font_embedders: &mut HashMap<String, FontEmbedder<'a>>,
+    alias_to_ps: &mut HashMap<String, String>,
+) {
+    for c in resolved {
+        let Some((idx, gid)) = c.glyph else { continue };
+        let (alias, font) = chain[idx];
+        alias_to_ps
+            .entry(alias.to_string())
+            .or_insert_with(|| font.postscript_name.clone());
+        let embedder = font_embedders
+            .entry(alias.to_string())
+            .or_insert_with(|| FontEmbedder::new(font, alias));
+        embedder.use_glyph(c.ch, gid);
+    }
+}
 
 /// Main PDF generator
 pub struct PdfGenerator<'a> {
@@ -42,27 +89,30 @@ impl<'a> PdfGenerator<'a> {
             for element in &page.elements {
                 match element {
                     Element::Text(t) => {
-                        let font = self.resources.get_font(&t.font)?;
-                        alias_to_ps.entry(t.font.clone()).or_insert_with(|| font.postscript_name.clone());
-                        let embedder = font_embedders
-                            .entry(t.font.clone())
-                            .or_insert_with(|| FontEmbedder::new(font, &t.font));
-                        embedder.use_text(&t.text)?;
+                        let chain = build_chain(self.resources, &t.font, &t.font_fallback)?;
+                        let chain_refs = chain_fonts(&chain);
+                        let chain_names = chain_aliases(&chain);
+                        let resolved = runs::resolve(
+                            &t.text, &chain_refs, &chain_names, t.missing_glyph_policy,
+                        )?;
+                        register_resolved_chars(&resolved, &chain, &mut font_embedders, &mut alias_to_ps);
                     }
                     Element::TextBox(tb) => {
-                        let font = self.resources.get_font(&tb.font)?;
-                        alias_to_ps.entry(tb.font.clone()).or_insert_with(|| font.postscript_name.clone());
-                        let embedder = font_embedders
-                            .entry(tb.font.clone())
-                            .or_insert_with(|| FontEmbedder::new(font, &tb.font));
-                        embedder.use_text(&tb.text)?;
+                        let chain = build_chain(self.resources, &tb.font, &tb.font_fallback)?;
+                        let chain_refs = chain_fonts(&chain);
+                        let chain_names = chain_aliases(&chain);
+                        let resolved = runs::resolve(
+                            &tb.text, &chain_refs, &chain_names, tb.missing_glyph_policy,
+                        )?;
+                        register_resolved_chars(&resolved, &chain, &mut font_embedders, &mut alias_to_ps);
                     }
                     Element::Barcode(b) if b.human_readable => {
-                        let font = self.resources.get_font(&b.font)?;
-                        alias_to_ps.entry(b.font.clone()).or_insert_with(|| font.postscript_name.clone());
-                        let embedder = font_embedders
-                            .entry(b.font.clone())
-                            .or_insert_with(|| FontEmbedder::new(font, &b.font));
+                        // Barcode HR text uses a single font (no fallback in this
+                        // element type). Resolve through the same machinery with
+                        // a length-1 chain so encoding stays uniform.
+                        let chain = build_chain(self.resources, &b.font, &[])?;
+                        let chain_refs = chain_fonts(&chain);
+                        let chain_names = chain_aliases(&chain);
                         // For GS1-128, the human-readable text is the parenthesized
                         // form, which adds '(' and ')' glyphs not present in `value`.
                         let hr_text = match b.kind {
@@ -76,7 +126,10 @@ impl<'a> PdfGenerator<'a> {
                             }
                             crate::types::BarcodeKind::Code128 => b.value.clone(),
                         };
-                        embedder.use_text(&hr_text)?;
+                        let resolved = runs::resolve(
+                            &hr_text, &chain_refs, &chain_names, MissingGlyphPolicy::Drop,
+                        )?;
+                        register_resolved_chars(&resolved, &chain, &mut font_embedders, &mut alias_to_ps);
                     }
                     Element::Image(img) => {
                         // Check image type to determine tracking strategy
@@ -344,55 +397,59 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         text: &TextElement,
         page_height: f32,
-        font_embedders: &HashMap<String, FontEmbedder>,
+        _font_embedders: &HashMap<String, FontEmbedder>,
         alias_to_ps: &HashMap<String, String>,
         alpha_states: &HashMap<u8, Ref>,
     ) -> Result<()> {
-        let font = self.resources.get_font(&text.font)?;
-        let embedder = font_embedders.get(&text.font)
-            .expect("font was collected in first pass");
-        let ps_name = alias_to_ps.get(&text.font)
-            .expect("font alias was collected in first pass");
+        let chain = build_chain(self.resources, &text.font, &text.font_fallback)?;
+        let chain_refs = chain_fonts(&chain);
+        let chain_names = chain_aliases(&chain);
 
-        // Calculate baseline position based on vertical anchor
-        // - baseline: y is the text baseline
-        // - capline: y is the top of capital letters
-        // - center: y is the midpoint between baseline and capline
-        let cap_height_pts = font.cap_height_pts(text.size);
+        // Primary font drives metrics — fallback chars share its baseline
+        // so they don't shift line positioning.
+        let primary = chain_refs[0];
+        let cap_height_pts = primary.cap_height_pts(text.size);
         let baseline_y = match text.vertical_anchor {
             VerticalAnchor::Baseline => page_height - text.y,
             VerticalAnchor::Capline => page_height - text.y - cap_height_pts,
             VerticalAnchor::Center => page_height - text.y - cap_height_pts / 2.0,
         };
 
-        // Calculate x based on alignment
-        let text_width = font.text_width(&text.text, text.size, &text.font)?;
+        let resolved = runs::resolve(
+            &text.text, &chain_refs, &chain_names, text.missing_glyph_policy,
+        )?;
+        let total_width = runs::measure(&resolved, &chain_refs, text.size);
         let x = match text.align {
             TextAlign::Left => text.x,
-            TextAlign::Center => text.x - text_width / 2.0,
-            TextAlign::Right => text.x - text_width,
+            TextAlign::Center => text.x - total_width / 2.0,
+            TextAlign::Right => text.x - total_width,
         };
 
-        // Save state to isolate graphics state changes
+        let render_runs = runs::group_runs(&resolved, &chain_names);
+        if render_runs.is_empty() {
+            return Ok(());
+        }
+
         content.save_state();
 
-        // Set alpha if needed
         if text.color.a != 255 {
             let alpha_name = self.get_alpha_state_name(text.color.a, alpha_states);
             content.set_parameters(Name(alpha_name.as_bytes()));
         }
 
-        // Set color and font - use PostScript name for Illustrator compatibility
         let (r, g, b) = text.color.to_rgb_floats();
         content.set_fill_rgb(r, g, b);
 
         content.begin_text();
-        content.set_font(Name(ps_name.as_bytes()), text.size);
         content.next_line(x, baseline_y);
-
-        // Encode text for CID font
-        let encoded = embedder.encode_text(&text.text);
-        content.show(Str(&encoded));
+        for run in &render_runs {
+            let ps_name = alias_to_ps
+                .get(run.font_alias)
+                .expect("font alias was collected in first pass");
+            content.set_font(Name(ps_name.as_bytes()), text.size);
+            let bytes = encode_glyphs(&run.glyphs);
+            content.show(Str(&bytes));
+        }
         content.end_text();
 
         content.restore_state();
@@ -405,13 +462,14 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         textbox: &TextBoxElement,
         page_height: f32,
-        font_embedders: &HashMap<String, FontEmbedder>,
+        _font_embedders: &HashMap<String, FontEmbedder>,
         alias_to_ps: &HashMap<String, String>,
         alpha_states: &HashMap<u8, Ref>,
     ) -> Result<()> {
-        let font = self.resources.get_font(&textbox.font)?;
-        let embedder = font_embedders.get(&textbox.font).expect("font was collected");
-        let ps_name = alias_to_ps.get(&textbox.font).expect("font alias was collected");
+        let chain = build_chain(self.resources, &textbox.font, &textbox.font_fallback)?;
+        let chain_refs = chain_fonts(&chain);
+        let chain_names = chain_aliases(&chain);
+        let primary = chain_refs[0];
 
         // Step 1: Compute box position from anchor point
         let box_left = match textbox.box_align_x {
@@ -425,17 +483,24 @@ impl<'a> PdfGenerator<'a> {
             BoxAlignY::Bottom => textbox.y - textbox.h,
         };
 
-        // Step 2: Word wrap text
-        let lines = font.wrap_text(&textbox.text, textbox.size, textbox.w, &textbox.font)?;
+        // Step 2: Word wrap text against the font chain
+        let lines = runs::wrap(
+            &textbox.text,
+            &chain_refs,
+            &chain_names,
+            textbox.size,
+            textbox.w,
+            textbox.missing_glyph_policy,
+        )?;
         let num_lines = lines.len();
         if num_lines == 0 {
             return Ok(());
         }
 
-        // Step 3: Calculate text block metrics
-        let cap_height = font.cap_height_pts(textbox.size);
-        let ascender = font.ascender_pts(textbox.size);
-        let descender = font.descender_pts(textbox.size).abs();
+        // Step 3: Block metrics from the primary font
+        let cap_height = primary.cap_height_pts(textbox.size);
+        let ascender = primary.ascender_pts(textbox.size);
+        let descender = primary.descender_pts(textbox.size).abs();
         let text_block_height = if num_lines == 1 {
             cap_height
         } else {
@@ -456,54 +521,55 @@ impl<'a> PdfGenerator<'a> {
         // Step 5: Set up clipping
         content.save_state();
 
-        // Clip to box bounds
         let pdf_box_bottom = page_height - box_top - textbox.h;
         content.rect(box_left, pdf_box_bottom, textbox.w, textbox.h);
         content.clip_nonzero();
         content.end_path();
 
-        // Set alpha if needed
         if textbox.color.a != 255 {
             let alpha_name = self.get_alpha_state_name(textbox.color.a, alpha_states);
             content.set_parameters(Name(alpha_name.as_bytes()));
         }
 
-        // Set color and font
         let (r, g, b) = textbox.color.to_rgb_floats();
         content.set_fill_rgb(r, g, b);
 
         content.begin_text();
-        content.set_font(Name(ps_name.as_bytes()), textbox.size);
 
-        // Step 6: Render each line
+        // Step 6: Render each line. The cursor advances per Td/Tj; font is
+        // switched mid-line via Tf at sub-run boundaries.
         let mut prev_x = 0.0;
         let mut prev_y = 0.0;
-        for (i, line) in lines.iter().enumerate() {
-            if line.is_empty() {
+        for (i, line_chars) in lines.iter().enumerate() {
+            if line_chars.is_empty() {
                 continue;
             }
 
-            // Calculate line baseline Y
             let line_y = first_baseline_y + i as f32 * textbox.line_height;
             let pdf_y = page_height - line_y;
 
-            // Calculate line X based on text alignment
-            let line_width = font.text_width(line, textbox.size, &textbox.font)?;
+            let line_width = runs::measure(line_chars, &chain_refs, textbox.size);
             let line_x = match textbox.text_align_x {
                 TextAlign::Left => box_left,
                 TextAlign::Center => box_left + (textbox.w - line_width) / 2.0,
                 TextAlign::Right => box_left + textbox.w - line_width,
             };
 
-            // Td operator is relative to previous position, so calculate offset
             let dx = line_x - prev_x;
             let dy = pdf_y - prev_y;
             content.next_line(dx, dy);
             prev_x = line_x;
             prev_y = pdf_y;
 
-            let encoded = embedder.encode_text(line);
-            content.show(Str(&encoded));
+            let line_runs = runs::group_runs(line_chars, &chain_names);
+            for run in &line_runs {
+                let ps_name = alias_to_ps
+                    .get(run.font_alias)
+                    .expect("font alias was collected in first pass");
+                content.set_font(Name(ps_name.as_bytes()), textbox.size);
+                let bytes = encode_glyphs(&run.glyphs);
+                content.show(Str(&bytes));
+            }
         }
 
         content.end_text();
@@ -767,25 +833,33 @@ impl<'a> PdfGenerator<'a> {
         // Draw human readable text
         if barcode.human_readable {
             let font = self.resources.get_font(&barcode.font)?;
-            let embedder = font_embedders.get(&barcode.font)
-                .expect("barcode font was collected in first pass");
-            let ps_name = alias_to_ps.get(&barcode.font)
+            let ps_name = alias_to_ps
+                .get(&barcode.font)
                 .expect("barcode font alias was collected in first pass");
 
-            let text_width = font.text_width(&human_readable_text, barcode.font_size, &barcode.font)?;
+            let chain_refs: Vec<&LoadedFont> = vec![font];
+            let chain_names: Vec<&str> = vec![barcode.font.as_str()];
+            let resolved = runs::resolve(
+                &human_readable_text, &chain_refs, &chain_names, MissingGlyphPolicy::Drop,
+            )?;
+            let text_width = runs::measure(&resolved, &chain_refs, barcode.font_size);
             let text_x = barcode.x + (barcode.w - text_width) / 2.0;
 
-            // Position text below barcode
             let ascender_pts = font.ascender_pts(barcode.font_size);
             let text_y = bar_bottom_y - 2.0 - ascender_pts;
 
             content.begin_text();
             content.set_font(Name(ps_name.as_bytes()), barcode.font_size);
             content.next_line(text_x, text_y);
-            let encoded_text = embedder.encode_text(&human_readable_text);
-            content.show(Str(&encoded_text));
+            for run in runs::group_runs(&resolved, &chain_names) {
+                let bytes = encode_glyphs(&run.glyphs);
+                content.show(Str(&bytes));
+            }
             content.end_text();
         }
+
+        // Silence unused-parameter warning when human_readable is false.
+        let _ = font_embedders;
 
         content.restore_state();
 

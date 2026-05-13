@@ -4,9 +4,14 @@ use pdf_writer::types::{CidFontType, FontFlags, SystemInfo, UnicodeCmap};
 use pdf_writer::{Filter, Finish, Name, Pdf, Ref, Str};
 use std::collections::{BTreeMap, HashSet};
 
-/// Handles font embedding into PDF
+/// Handles font embedding into PDF.
+///
+/// One embedder per loaded font (per user alias). The embedder does not
+/// perform cmap lookups itself — callers resolve characters to glyph ids
+/// via `crate::runs::resolve` and register the resolved glyphs here.
 pub struct FontEmbedder<'a> {
     font: &'a LoadedFont,
+    #[allow(dead_code)]
     font_name: &'a str,
     used_glyphs: HashSet<u16>,
     char_to_glyph: BTreeMap<char, u16>,
@@ -22,24 +27,11 @@ impl<'a> FontEmbedder<'a> {
         }
     }
 
-    /// Register a character as used (call for each char in text)
-    pub fn use_char(&mut self, ch: char) -> Result<u16> {
-        let glyph_id = self.font.glyph_id(ch, self.font_name)?;
+    /// Register a (char, glyph_id) pair as used. The glyph id must already
+    /// be resolved against this embedder's font.
+    pub fn use_glyph(&mut self, ch: char, glyph_id: u16) {
         self.used_glyphs.insert(glyph_id);
         self.char_to_glyph.insert(ch, glyph_id);
-        Ok(glyph_id)
-    }
-
-    /// Register all characters in a string (skips control characters like newlines)
-    pub fn use_text(&mut self, text: &str) -> Result<()> {
-        for ch in text.chars() {
-            // Skip control characters (newlines, tabs, etc.) - they have no glyphs
-            if ch.is_control() {
-                continue;
-            }
-            self.use_char(ch)?;
-        }
-        Ok(())
     }
 
     /// Embed the font into the PDF and return the font dictionary reference
@@ -159,15 +151,14 @@ impl<'a> FontEmbedder<'a> {
         cmap.finish()
     }
 
-    /// Encode text as PDF hex string for CID font
-    pub fn encode_text(&self, text: &str) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(text.len() * 2);
-        for ch in text.chars() {
-            if let Some(&glyph_id) = self.char_to_glyph.get(&ch) {
-                bytes.push((glyph_id >> 8) as u8);
-                bytes.push((glyph_id & 0xFF) as u8);
-            }
-        }
-        bytes
+}
+
+/// Encode a sequence of glyph ids as PDF CID font bytes (big-endian u16 each).
+pub fn encode_glyphs(glyphs: &[(char, u16)]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(glyphs.len() * 2);
+    for (_, gid) in glyphs {
+        bytes.push((gid >> 8) as u8);
+        bytes.push((gid & 0xFF) as u8);
     }
+    bytes
 }

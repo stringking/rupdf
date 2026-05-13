@@ -1,7 +1,7 @@
 mod fonts;
 mod writer;
 
-pub use fonts::FontEmbedder;
+pub use fonts::{encode_glyphs, FontEmbedder};
 pub use writer::PdfGenerator;
 
 #[cfg(test)]

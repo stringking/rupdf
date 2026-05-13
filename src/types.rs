@@ -56,6 +56,31 @@ impl<'py> FromPyObject<'_, 'py> for Color {
     }
 }
 
+/// Behavior when a character is not covered by any font in the fallback chain.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MissingGlyphPolicy {
+    /// Silently drop the character from the output.
+    #[default]
+    Drop,
+    /// Raise RupdfError::MissingGlyph naming the primary font.
+    Raise,
+}
+
+impl<'py> FromPyObject<'_, 'py> for MissingGlyphPolicy {
+    type Error = PyErr;
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
+        let s: String = ob.extract()?;
+        match s.as_str() {
+            "drop" => Ok(MissingGlyphPolicy::Drop),
+            "raise" => Ok(MissingGlyphPolicy::Raise),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid missing_glyph_policy: '{}'. Must be 'drop' or 'raise'",
+                s
+            ))),
+        }
+    }
+}
+
 /// Text alignment
 #[derive(Debug, Clone, Copy, Default)]
 pub enum TextAlign {
@@ -192,6 +217,8 @@ pub struct TextElement {
     pub y: f32,
     pub text: String,
     pub font: String,
+    pub font_fallback: Vec<String>,
+    pub missing_glyph_policy: MissingGlyphPolicy,
     pub size: f32,
     pub color: Color,
     pub align: TextAlign,
@@ -342,6 +369,8 @@ pub struct TextBoxElement {
     pub text_align_y: TextAlignY,
     pub text: String,
     pub font: String,
+    pub font_fallback: Vec<String>,
+    pub missing_glyph_policy: MissingGlyphPolicy,
     pub size: f32,
     pub line_height: f32,
     pub color: Color,
@@ -491,6 +520,8 @@ impl Element {
                 y: with_element_context(req(dict, "y"), index)?,
                 text: with_element_context(req(dict, "text"), index)?,
                 font: with_element_context(req(dict, "font"), index)?,
+                font_fallback: with_element_context(opt_or(dict, "font_fallback", Vec::new()), index)?,
+                missing_glyph_policy: with_element_context(opt_default(dict, "missing_glyph_policy"), index)?,
                 size: with_element_context(req(dict, "size"), index)?,
                 color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
                 align: with_element_context(opt_default(dict, "align"), index)?,
@@ -511,6 +542,8 @@ impl Element {
                     text_align_y: with_element_context(opt_default(dict, "text_align_y"), index)?,
                     text: with_element_context(req(dict, "text"), index)?,
                     font: with_element_context(req(dict, "font"), index)?,
+                    font_fallback: with_element_context(opt_or(dict, "font_fallback", Vec::new()), index)?,
+                    missing_glyph_policy: with_element_context(opt_default(dict, "missing_glyph_policy"), index)?,
                     size,
                     line_height,
                     color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
