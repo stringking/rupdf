@@ -4,6 +4,8 @@ Tests that generated PDFs have correct structure without
 comparing exact byte sequences.
 """
 
+import re
+
 import pytest
 import rupdf
 
@@ -387,6 +389,60 @@ class TestBarcodes:
         }
         pdf = rupdf.render_pdf(doc)
         assert pdf.startswith(b"%PDF-")
+
+
+class TestTextBoxClipping:
+    """The textbox clip must not shear ink that alignment modes place
+    outside the box (capline: ascenders above the top; baseline:
+    descenders below the bottom)."""
+
+    # Box geometry in user coords: page 288x144, box at (18, 36), 252x72.
+    # In PDF coords (bottom-left origin): bottom = 144 - 36 - 72 = 36, top = 108.
+    BOX_BOTTOM = 36.0
+    BOX_TOP = 108.0
+
+    def _clip_rect(self, font_path, text_align_y):
+        doc = {
+            "pages": [{
+                "size": (288.0, 144.0),
+                "elements": [{
+                    "type": "textbox",
+                    "x": 18.0, "y": 36.0, "w": 252.0, "h": 72.0,
+                    "text": "Midfield",
+                    "font": "f", "size": 16.0,
+                    "text_align_y": text_align_y,
+                }],
+            }],
+            "resources": {"fonts": {"f": {"path": font_path}}},
+        }
+        pdf = rupdf.render_pdf(doc, compress=False)
+        m = re.search(rb"([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) re\nW\nn", pdf)
+        assert m is not None, "No clip rect found in content stream"
+        x, bottom, w, h = (float(v) for v in m.groups())
+        return x, bottom, w, h
+
+    def test_capline_clip_extends_above_box(self, font_path):
+        """Capline puts the cap top at the box top, so ascenders and i-dots
+        rise above it; the clip's top edge must extend up past the box."""
+        x, bottom, w, h = self._clip_rect(font_path, "capline")
+        assert bottom == pytest.approx(self.BOX_BOTTOM)
+        assert bottom + h > self.BOX_TOP
+        assert x == pytest.approx(18.0)
+        assert w == pytest.approx(252.0)
+
+    def test_baseline_clip_extends_below_box(self, font_path):
+        """Baseline puts the last baseline at the box bottom, so descenders
+        hang below it; the clip's bottom edge must extend down past the box."""
+        x, bottom, w, h = self._clip_rect(font_path, "baseline")
+        assert bottom < self.BOX_BOTTOM
+        assert bottom + h == pytest.approx(self.BOX_TOP)
+
+    @pytest.mark.parametrize("align", ["top", "center", "bottom"])
+    def test_other_modes_clip_exactly_to_box(self, font_path, align):
+        """Modes with no intentional overhang keep the exact box clip."""
+        x, bottom, w, h = self._clip_rect(font_path, align)
+        assert bottom == pytest.approx(self.BOX_BOTTOM)
+        assert h == pytest.approx(72.0)
 
 
 class TestPageDimensions:

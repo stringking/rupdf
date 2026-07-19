@@ -41,11 +41,15 @@ benchmarks/*.pdf
 benchmarks/*.json
 
 # Test assets directory (not versioned - provide your own images via CLI args)
-tests/
+# Root-anchored so python/tests/ stays tracked
+/tests/
 
 # Benchmark outputs
 benchmarks/results/
 *.bench.json
+
+# Specs (session planning docs — see stringking specs convention)
+.specs/
 
 # Secrets
 .env

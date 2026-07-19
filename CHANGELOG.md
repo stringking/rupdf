@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-07-19
+
+### Fixed
+
+- **Textbox clipping no longer shears ascenders and descenders** in the
+  `capline` and `baseline` vertical alignment modes. `capline` aligns the
+  first line's cap top with the box top, placing ascenders (`b d f h k l`,
+  i/j dots, diacritics) above the box; `baseline` aligns the last line's
+  baseline with the box bottom, placing descenders (`g j p q y`) below it.
+  The clip rect previously matched the exact box, cutting that ink off
+  flat. The clip now extends by the overhang each mode implies
+  (`ascender − cap_height` above for `capline`, the descender depth below
+  for `baseline`), so mixed-case text renders whole. Line-overflow
+  clipping and the other alignment modes are unchanged.
+
+### Changed
+
+- `__version__` is read from package metadata instead of being hardcoded,
+  so it can no longer drift from the built wheel's version.
+
 ## [0.2.0] - 2026-05-13
 
 ### Added

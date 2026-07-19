@@ -518,11 +518,24 @@ impl<'a> PdfGenerator<'a> {
             TextAlignY::Bottom => box_top + textbox.h - last_baseline_offset - descender,
         };
 
-        // Step 5: Set up clipping
+        // Step 5: Set up clipping. Capline/Baseline intentionally place ink
+        // outside the box (ascenders above the cap line, descenders below the
+        // baseline), so extend the clip by that overhang on the relevant edge;
+        // the clip only needs to cut off whole lines that don't fit.
         content.save_state();
 
-        let pdf_box_bottom = page_height - box_top - textbox.h;
-        content.rect(box_left, pdf_box_bottom, textbox.w, textbox.h);
+        let (clip_top_extra, clip_bottom_extra) = match textbox.text_align_y {
+            TextAlignY::Capline => ((ascender - cap_height).max(0.0), 0.0),
+            TextAlignY::Baseline => (0.0, descender),
+            _ => (0.0, 0.0),
+        };
+        let pdf_box_bottom = page_height - box_top - textbox.h - clip_bottom_extra;
+        content.rect(
+            box_left,
+            pdf_box_bottom,
+            textbox.w,
+            textbox.h + clip_top_extra + clip_bottom_extra,
+        );
         content.clip_nonzero();
         content.end_path();
 
