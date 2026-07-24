@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-07-24
+
+### Added
+
+- **`strikethrough` option on text elements.** When `"strikethrough": true`,
+  a horizontal line is drawn through the text at the font's OS/2 strikeout
+  position, spanning the exact rendered run width, in the text color. Line
+  thickness also comes from the font's metrics; fonts lacking the OS/2
+  strikeout table fall back to mid cap-height position and a 1/18-em rule.
+  Because rupdf places the line using the same measured run width and
+  aligned left edge it uses to draw the glyphs, the strike tracks left-,
+  center-, and right-aligned text exactly. Defaults to `false`; applies to
+  single-line `text` elements (not `textbox`).
+
 ## [0.2.1] - 2026-07-19
 
 ### Fixed

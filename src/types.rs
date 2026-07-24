@@ -223,6 +223,7 @@ pub struct TextElement {
     pub color: Color,
     pub align: TextAlign,
     pub vertical_anchor: VerticalAnchor,
+    pub strikethrough: bool,
 }
 
 /// Rectangle element
@@ -526,6 +527,7 @@ impl Element {
                 color: with_element_context(opt_or(dict, "color", Color::black()), index)?,
                 align: with_element_context(opt_default(dict, "align"), index)?,
                 vertical_anchor: with_element_context(opt_default(dict, "vertical_anchor"), index)?,
+                strikethrough: with_element_context(opt_or(dict, "strikethrough", false), index)?,
             })),
 
             "textbox" => {

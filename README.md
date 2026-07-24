@@ -102,7 +102,8 @@ Common page sizes:
     "size": 12,                   # Font size in points
     "color": (0, 0, 0, 255),      # RGBA (optional, default black)
     "align": "left",              # "left", "center", or "right" (optional)
-    "vertical_anchor": "baseline" # "baseline", "capline", or "center" (optional)
+    "vertical_anchor": "baseline",# "baseline", "capline", or "center" (optional)
+    "strikethrough": False        # Draw a line through the text (optional)
 }
 ```
 
@@ -116,6 +117,11 @@ Common page sizes:
   - `"baseline"` (default): y is the text baseline
   - `"capline"`: y is the top of capital letters
   - `"center"`: y is the vertical center of capital letters
+
+**Strikethrough:** when `"strikethrough": True`, a horizontal line is drawn
+through the text at the font's strikeout position, spanning the exact rendered
+run width, in the text color. Position and thickness come from the font's
+metrics (with sensible fallbacks for fonts that lack them).
 
 ### TextBox
 

@@ -11,6 +11,8 @@ pub struct LoadedFont {
     pub ascender: i16,
     pub descender: i16,
     pub cap_height: i16,                   // Height of capital letters
+    pub strikeout_position: i16,           // Strikeout line position above baseline
+    pub strikeout_thickness: i16,          // Strikeout line thickness
     pub glyph_widths: HashMap<u16, u16>, // glyph_id -> advance width
     pub cmap: HashMap<char, u16>,         // char -> glyph_id
 }
@@ -42,6 +44,16 @@ impl LoadedFont {
                     .map(|bbox| bbox.y_max)
             })
             .unwrap_or_else(|| (ascender as f32 * 0.7) as i16);
+
+        // Strikeout metrics from OS/2 table. Fallbacks: mid cap-height centers
+        // the strike on lining figures; thickness ~1/18 em is a typical rule.
+        let strikeout = face.strikeout_metrics();
+        let strikeout_position = strikeout
+            .map(|m| m.position)
+            .unwrap_or_else(|| (cap_height as f32 * 0.5) as i16);
+        let strikeout_thickness = strikeout
+            .map(|m| m.thickness)
+            .unwrap_or_else(|| (units_per_em as f32 / 18.0) as i16);
 
         // Extract PostScript name from name table (name_id 6)
         let postscript_name = face
@@ -83,6 +95,8 @@ impl LoadedFont {
             ascender,
             descender,
             cap_height,
+            strikeout_position,
+            strikeout_thickness,
             glyph_widths,
             cmap,
         })
@@ -118,6 +132,16 @@ impl LoadedFont {
     /// Get descender in points for given font size (returns negative value)
     pub fn descender_pts(&self, size: f32) -> f32 {
         self.descender as f32 * size / self.units_per_em as f32
+    }
+
+    /// Strikeout line position above baseline, in points, for the given size.
+    pub fn strikeout_position_pts(&self, size: f32) -> f32 {
+        self.strikeout_position as f32 * size / self.units_per_em as f32
+    }
+
+    /// Strikeout line thickness, in points, for the given size.
+    pub fn strikeout_thickness_pts(&self, size: f32) -> f32 {
+        self.strikeout_thickness as f32 * size / self.units_per_em as f32
     }
 }
 
@@ -219,5 +243,42 @@ impl LoadedResources {
         self.images
             .get(name)
             .ok_or_else(|| RupdfError::MissingImage(name.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn load_sans() -> LoadedFont {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("assets")
+            .join("IBMPlexSans-Regular.otf");
+        LoadedFont::load("sans", &FontSource::Path(path.to_str().unwrap().to_string())).unwrap()
+    }
+
+    #[test]
+    fn strikeout_metrics_extracted_from_os2() {
+        let font = load_sans();
+        // IBM Plex Sans carries OS/2 strikeout metrics: the position sits
+        // above the baseline but below cap height, and the rule has weight.
+        assert!(font.strikeout_position > 0);
+        assert!(font.strikeout_position < font.cap_height);
+        assert!(font.strikeout_thickness > 0);
+    }
+
+    #[test]
+    fn strikeout_accessors_scale_by_size() {
+        let font = load_sans();
+        // At size == units_per_em, points equal raw font units.
+        let em = font.units_per_em as f32;
+        assert_eq!(font.strikeout_position_pts(em), font.strikeout_position as f32);
+        assert_eq!(font.strikeout_thickness_pts(em), font.strikeout_thickness as f32);
+        // Linear in size.
+        assert!(
+            (font.strikeout_position_pts(24.0) - 2.0 * font.strikeout_position_pts(12.0)).abs()
+                < 1e-4
+        );
     }
 }

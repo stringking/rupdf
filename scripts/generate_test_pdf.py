@@ -163,6 +163,28 @@ def build_document(fonts: dict, images: dict) -> dict:
         "size": 12,
         "color": (0, 0, 200, 255),
     })
+    y += 18
+
+    # Strikethrough text (superseded-price pattern)
+    elements_page1.append({
+        "type": "text",
+        "x": MARGIN,
+        "y": y,
+        "text": "$10.00 struck through",
+        "font": default_font,
+        "size": 12,
+        "color": (0, 0, 0, 255),
+        "strikethrough": True,
+    })
+    elements_page1.append({
+        "type": "text",
+        "x": MARGIN + 170,
+        "y": y,
+        "text": "$8.50 not struck",
+        "font": default_font,
+        "size": 12,
+        "color": (0, 0, 0, 255),
+    })
     y += 35
 
     # --- RECTANGLE SECTION ---

@@ -32,6 +32,9 @@ class TextElement(TypedDict, total=False):
     color: Color
     align: HAlign
     vertical_anchor: VerticalAnchor
+    # Draw a horizontal line through the text at the font's strikeout
+    # position, spanning the rendered run width, in the text color.
+    strikethrough: bool
 
 
 class TextBoxElement(TypedDict, total=False):

@@ -452,6 +452,18 @@ impl<'a> PdfGenerator<'a> {
         }
         content.end_text();
 
+        // Paths can't go inside a BT/ET text object, so the strike is drawn
+        // after end_text but within the same save/restore so alpha still applies.
+        if text.strikethrough {
+            let strike_y = baseline_y + primary.strikeout_position_pts(text.size);
+            let thickness = primary.strikeout_thickness_pts(text.size);
+            content.set_stroke_rgb(r, g, b);
+            content.set_line_width(thickness);
+            content.move_to(x, strike_y);
+            content.line_to(x + total_width, strike_y);
+            content.stroke();
+        }
+
         content.restore_state();
 
         Ok(())

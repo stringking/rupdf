@@ -445,6 +445,83 @@ class TestTextBoxClipping:
         assert h == pytest.approx(72.0)
 
 
+class TestStrikethrough:
+    """Struck text draws a horizontal line through the glyph run, placed by
+    the font's strikeout metrics and spanning the measured run width."""
+
+    # Page 400x200; text baseline-anchored at y=72 → PDF baseline_y = 128.
+    PAGE = (400.0, 200.0)
+    BASELINE_Y = 128.0
+    SIZE = 24.0
+    ANCHOR_X = 150.0
+
+    STRIKE_RE = re.compile(rb"([-\d.]+) ([-\d.]+) m\n([-\d.]+) ([-\d.]+) l\nS")
+
+    def _render(self, font_path, strikethrough, align="left", **extra):
+        element = {
+            "type": "text",
+            "x": self.ANCHOR_X, "y": 72.0,
+            "text": "$10.00",
+            "font": "f", "size": self.SIZE,
+            "align": align,
+            "vertical_anchor": "baseline",
+            **extra,
+        }
+        if strikethrough is not None:
+            element["strikethrough"] = strikethrough
+        doc = {
+            "pages": [{"size": self.PAGE, "elements": [element]}],
+            "resources": {"fonts": {"f": {"path": font_path}}},
+        }
+        return rupdf.render_pdf(doc, compress=False)
+
+    def _strike_line(self, font_path, align="left"):
+        pdf = self._render(font_path, True, align)
+        m = self.STRIKE_RE.search(pdf)
+        assert m is not None, "No stroked line found in content stream"
+        x1, y1, x2, y2 = (float(v) for v in m.groups())
+        return x1, y1, x2, y2
+
+    @pytest.mark.parametrize("strikethrough", [None, False], ids=["absent", "false"])
+    def test_no_strike_by_default(self, font_path, strikethrough):
+        pdf = self._render(font_path, strikethrough)
+        assert self.STRIKE_RE.search(pdf) is None
+
+    def test_strike_is_horizontal_above_baseline(self, font_path):
+        x1, y1, x2, y2 = self._strike_line(font_path)
+        assert y1 == y2
+        # Between the baseline and the top of the em box — i.e. through the text.
+        assert self.BASELINE_Y < y1 < self.BASELINE_Y + self.SIZE
+
+    def test_left_align_starts_at_anchor(self, font_path):
+        x1, y1, x2, y2 = self._strike_line(font_path, "left")
+        assert x1 == pytest.approx(self.ANCHOR_X)
+        assert x2 > x1
+
+    def test_center_align_centers_on_anchor(self, font_path):
+        x1, y1, x2, y2 = self._strike_line(font_path, "center")
+        assert (x1 + x2) / 2 == pytest.approx(self.ANCHOR_X, abs=0.01)
+
+    def test_right_align_ends_at_anchor(self, font_path):
+        x1, y1, x2, y2 = self._strike_line(font_path, "right")
+        assert x2 == pytest.approx(self.ANCHOR_X)
+        assert x1 < x2
+
+    def test_width_matches_run_across_alignments(self, font_path):
+        widths = {
+            align: (lambda p: p[2] - p[0])(self._strike_line(font_path, align))
+            for align in ("left", "center", "right")
+        }
+        assert widths["left"] == pytest.approx(widths["center"], abs=0.01)
+        assert widths["left"] == pytest.approx(widths["right"], abs=0.01)
+        # Sanity: roughly the width of a 6-glyph run, not the whole page.
+        assert 0.5 * self.SIZE < widths["left"] < 6 * self.SIZE
+
+    def test_strike_uses_text_color(self, font_path):
+        pdf = self._render(font_path, True, color=(255, 0, 0, 255))
+        assert b"1 0 0 RG" in pdf
+
+
 class TestPageDimensions:
     """Test page dimension handling."""
 
