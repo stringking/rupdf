@@ -39,17 +39,32 @@ pub fn write_svg_form(
 fn render_svg_to_content(tree: &Tree, svg_height: f32) -> Result<Vec<u8>> {
     let mut content = Content::new();
 
+    // SVG is y-down, PDF is y-up. Flip once here, as the outermost transform,
+    // and emit every path point in raw SVG coordinates below. That keeps the
+    // whole tree in SVG's own space, so nested group/path transforms compose
+    // the way the SVG author meant them to.
+    //
+    // Flipping each point individually instead (y -> svg_height - y) puts the
+    // points in PDF space while the SVG transforms are still pushed as PDF
+    // CTMs, which computes transform(flip(p)) where SVG semantics require
+    // flip(transform(p)). Those agree only when the transform commutes with
+    // the flip -- true for the identity and for a `matrix(1,0,0,-1,0,height)`,
+    // which is why this survived, but wrong for everything else. A
+    // `matrix(1,0,0,-1,0,ty)` group landed 2*(svg_height - ty) away from where
+    // it belonged, and a plain vertical translate had its direction reversed.
+    content.transform([1.0, 0.0, 0.0, -1.0, 0.0, svg_height]);
+
     // Walk the SVG tree and render each node
-    render_node(&tree.root, &mut content, svg_height);
+    render_node(&tree.root, &mut content);
 
     Ok(content.finish())
 }
 
 /// Recursively render a usvg node to PDF content
-fn render_node(node: &usvg::Node, content: &mut Content, svg_height: f32) {
+fn render_node(node: &usvg::Node, content: &mut Content) {
     match &*node.borrow() {
         NodeKind::Path(path) => {
-            render_path(path, content, svg_height);
+            render_path(path, content);
         }
         NodeKind::Group(group) => {
             // Save state if there's a transform
@@ -61,7 +76,7 @@ fn render_node(node: &usvg::Node, content: &mut Content, svg_height: f32) {
 
             // Render children
             for child in node.children() {
-                render_node(&child, content, svg_height);
+                render_node(&child, content);
             }
 
             if has_transform {
@@ -78,7 +93,7 @@ fn render_node(node: &usvg::Node, content: &mut Content, svg_height: f32) {
 }
 
 /// Render a single SVG path to PDF
-fn render_path(path: &usvg::Path, content: &mut Content, svg_height: f32) {
+fn render_path(path: &usvg::Path, content: &mut Content) {
     // Apply path-level transform if present
     let has_transform = path.transform != usvg::Transform::default();
     if has_transform {
@@ -91,16 +106,16 @@ fn render_path(path: &usvg::Path, content: &mut Content, svg_height: f32) {
     for segment in data.segments() {
         match segment {
             PathSegment::MoveTo { x, y } => {
-                content.move_to(x as f32, svg_height - y as f32);
+                content.move_to(x as f32, y as f32);
             }
             PathSegment::LineTo { x, y } => {
-                content.line_to(x as f32, svg_height - y as f32);
+                content.line_to(x as f32, y as f32);
             }
             PathSegment::CurveTo { x1, y1, x2, y2, x, y } => {
                 content.cubic_to(
-                    x1 as f32, svg_height - y1 as f32,
-                    x2 as f32, svg_height - y2 as f32,
-                    x as f32, svg_height - y as f32,
+                    x1 as f32, y1 as f32,
+                    x2 as f32, y2 as f32,
+                    x as f32, y as f32,
                 );
             }
             PathSegment::ClosePath => {

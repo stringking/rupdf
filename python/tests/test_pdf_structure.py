@@ -5,6 +5,7 @@ comparing exact byte sequences.
 """
 
 import re
+import zlib
 
 import pytest
 import rupdf
@@ -599,3 +600,126 @@ class TestRectStroke:
         rect is a no-op, not a failure."""
         assert len(self._render()) > 0
         assert len(self._render(stroke=0)) > 0
+
+
+class TestSvgTransform:
+    """SVG transforms must compose in SVG's own coordinate space.
+
+    SVG is y-down and PDF is y-up, so the tree needs one flip. Doing that flip
+    per point puts the points in PDF space while group transforms are still
+    pushed as PDF CTMs, which computes transform(flip(p)) where SVG semantics
+    require flip(transform(p)). Those agree only when the transform commutes
+    with the flip, so an untransformed SVG looked correct while every
+    transformed one was misplaced.
+    """
+
+    SIZE = 100.0
+    FLIP = (1, 0, 0, -1, 0, SIZE)
+    SQUARE = '<path d="M 10 10 L 30 10 L 30 20 L 10 20 Z" fill="#000"/>'
+    CORNERS = [(10, 10), (30, 10), (30, 20), (10, 20)]
+
+    @staticmethod
+    def _mul(m, n):
+        a1, b1, c1, d1, e1, f1 = m
+        a2, b2, c2, d2, e2, f2 = n
+        return (a1 * a2 + b1 * c2, a1 * b2 + b1 * d2,
+                c1 * a2 + d1 * c2, c1 * b2 + d1 * d2,
+                e1 * a2 + f1 * c2 + e2, e1 * b2 + f1 * d2 + f2)
+
+    @staticmethod
+    def _apply(m, p):
+        a, b, c, d, e, f = m
+        x, y = p
+        return (a * x + c * y + e, b * x + d * y + f)
+
+    def _composed_points(self, inner):
+        """Render an SVG and return its path points in PDF device space."""
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" '
+            'viewBox="0 0 100 100">%s</svg>' % inner
+        ).encode()
+        doc = {
+            "pages": [{
+                "size": (self.SIZE, self.SIZE),
+                "elements": [{"type": "image", "x": 0, "y": 0,
+                              "w": self.SIZE, "h": self.SIZE, "image_ref": "s"}],
+            }],
+            "resources": {"images": {"s": {"bytes": svg}}},
+        }
+        pdf = rupdf.render_pdf(doc, compress=False)
+
+        stream = None
+        for m in re.finditer(rb"stream\r?\n", pdf):
+            start = m.end()
+            try:
+                out = zlib.decompress(pdf[start:pdf.find(b"endstream", start)])
+            except zlib.error:
+                continue
+            if b" m\n" in out:
+                stream = out.decode("latin-1")
+                break
+        assert stream is not None, "no SVG form content stream found"
+
+        ctm, stack, pts = (1, 0, 0, 1, 0, 0), [], []
+        for line in stream.splitlines():
+            tok = line.split()
+            if not tok:
+                continue
+            if tok[-1] == "cm":
+                ctm = self._mul(tuple(float(v) for v in tok[:6]), ctm)
+            elif tok[-1] == "q":
+                stack.append(ctm)
+            elif tok[-1] == "Q":
+                ctm = stack.pop()
+            elif tok[-1] in ("m", "l") and len(tok) == 3:
+                pts.append(self._apply(ctm, (float(tok[0]), float(tok[1]))))
+        return sorted(pts)
+
+    def _assert_matches(self, inner, transform):
+        got = self._composed_points(inner)
+        want = sorted(self._apply(self.FLIP, self._apply(transform, p))
+                      for p in self.CORNERS)
+        assert len(got) == len(want)
+        for (gx, gy), (wx, wy) in zip(got, want):
+            assert gx == pytest.approx(wx, abs=0.01)
+            assert gy == pytest.approx(wy, abs=0.01)
+
+    def test_no_transform(self):
+        self._assert_matches(self.SQUARE, (1, 0, 0, 1, 0, 0))
+
+    def test_negative_scale_flip(self):
+        """matrix(1,0,0,-1,0,ty) with ty != height: the reported failure."""
+        self._assert_matches(
+            '<g transform="matrix(1,0,0,-1,0,50)">%s</g>' % self.SQUARE,
+            (1, 0, 0, -1, 0, 50),
+        )
+
+    def test_vertical_translate(self):
+        """A plain vertical translate had its direction reversed."""
+        self._assert_matches(
+            '<g transform="translate(0,20)">%s</g>' % self.SQUARE,
+            (1, 0, 0, 1, 0, 20),
+        )
+
+    def test_scale(self):
+        self._assert_matches(
+            '<g transform="scale(2,2)">%s</g>' % self.SQUARE,
+            (2, 0, 0, 2, 0, 0),
+        )
+
+    def test_nested_translate_then_flip(self):
+        self._assert_matches(
+            '<g transform="translate(10,0)">'
+            '<g transform="matrix(1,0,0,-1,0,50)">%s</g></g>' % self.SQUARE,
+            self._mul((1, 0, 0, -1, 0, 50), (1, 0, 0, 1, 10, 0)),
+        )
+
+    def test_transform_on_path_element(self):
+        """usvg 0.29 keeps a transform on the <path> itself rather than
+        folding it into the path data, so render_path's own transform branch
+        is live and needs the same coordinate space as the group branch."""
+        self._assert_matches(
+            '<path transform="matrix(1,0,0,-1,0,50)" '
+            'd="M 10 10 L 30 10 L 30 20 L 10 20 Z" fill="#000"/>',
+            (1, 0, 0, -1, 0, 50),
+        )
