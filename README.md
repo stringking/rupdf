@@ -226,8 +226,8 @@ doc = {
     "y": 72,
     "w": 100,
     "h": 50,
-    "stroke": 1.0,                     # Stroke width (0 for no stroke)
-    "stroke_color": (0, 0, 0, 255),    # Optional
+    "stroke": 1.0,                     # Optional, defaults to 0 (no stroke)
+    "stroke_color": (0, 0, 0, 255),    # Optional, defaults to black
     "fill_color": (255, 255, 255, 255), # Optional
     "corner_radius": 10                # Optional, for rounded corners
 }

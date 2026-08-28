@@ -557,7 +557,11 @@ impl Element {
                 y: with_element_context(req(dict, "y"), index)?,
                 w: with_element_context(req(dict, "w"), index)?,
                 h: with_element_context(req(dict, "h"), index)?,
-                stroke: with_element_context(opt_or(dict, "stroke", 1.0), index)?,
+                // Absent means none. A non-zero default strokes rects that never
+                // asked for one, growing them by half the stroke width on every
+                // side and rimming any fill in stroke_color's default black —
+                // silent, since the path geometry still inspects as correct.
+                stroke: with_element_context(opt_or(dict, "stroke", 0.0), index)?,
                 stroke_color: with_element_context(opt_or(dict, "stroke_color", Color::black()), index)?,
                 fill_color: with_element_context(opt(dict, "fill_color"), index)?,
                 corner_radius: with_element_context(opt_or(dict, "corner_radius", 0.0), index)?,

@@ -65,6 +65,7 @@ class RectElement(TypedDict, total=False):
     y: float
     w: float
     h: float
+    #: Stroke width. Omitted means no stroke.
     stroke: float
     stroke_color: Color
     fill_color: Color

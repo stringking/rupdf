@@ -551,3 +551,51 @@ class TestPageDimensions:
         }
         pdf = rupdf.render_pdf(doc)
         assert b"/MediaBox [0 0 400 600]" in pdf or b"/MediaBox[0 0 400 600]" in pdf
+
+
+class TestRectStroke:
+    """A rect is stroked only when a stroke width is asked for. An omitted
+    `stroke` key means none — a non-zero default would grow the rect by half
+    the stroke width on every side and rim any fill in the default black,
+    silently, since the emitted path geometry stays correct either way."""
+
+    STROKE_OP = re.compile(rb"\nS\n")
+    LINE_WIDTH = re.compile(rb"([\d.]+) w")
+
+    def _render(self, **extra):
+        doc = {
+            "pages": [{
+                "size": (200.0, 100.0),
+                "elements": [{
+                    "type": "rect", "x": 10.0, "y": 10.0, "w": 100.0, "h": 20.0,
+                    **extra,
+                }],
+            }],
+        }
+        return rupdf.render_pdf(doc, compress=False)
+
+    def test_omitted_stroke_does_not_stroke(self):
+        pdf = self._render(fill_color=(255, 255, 255, 255))
+        assert not self.STROKE_OP.search(pdf)
+        assert not self.LINE_WIDTH.search(pdf)
+
+    def test_explicit_zero_does_not_stroke(self):
+        pdf = self._render(fill_color=(255, 255, 255, 255), stroke=0)
+        assert not self.STROKE_OP.search(pdf)
+
+    def test_explicit_width_is_honoured(self):
+        pdf = self._render(fill_color=(255, 255, 255, 255), stroke=3)
+        assert self.STROKE_OP.search(pdf)
+        assert self.LINE_WIDTH.search(pdf).group(1) == b"3"
+
+    def test_stroke_only_rect_still_renders(self):
+        """No fill and an explicit stroke is the outlined-box case."""
+        pdf = self._render(stroke=1)
+        assert self.STROKE_OP.search(pdf)
+
+    def test_rect_painting_nothing_is_not_an_error(self):
+        """Consistent with every other element: rupdf renders zero-area rects,
+        empty text and transparent fills without complaint, so an unpainted
+        rect is a no-op, not a failure."""
+        assert len(self._render()) > 0
+        assert len(self._render(stroke=0)) > 0
