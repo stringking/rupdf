@@ -809,9 +809,9 @@ impl<'a> PdfGenerator<'a> {
 
         let (symbols, human_readable_text) = match barcode.kind {
             BarcodeKind::Code128 => {
-                // Plain Code 128 with Code-B start: a single Data symbol is enough
-                // — rubar_core::encode_code128 auto-inserts Code-B when no start
-                // symbol is specified.
+                // Plain Code 128: a single Data symbol is enough — with no start
+                // symbol specified, rubar_core::encode_code128 plans a minimal
+                // A/B/C encoding, packing digit runs into Code C.
                 (
                     vec![Code128Symbol::Data(barcode.value.clone())],
                     barcode.value.clone(),

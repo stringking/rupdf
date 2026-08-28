@@ -50,14 +50,28 @@ python scripts/generate_test_pdf.py --svg image.svg --png image.png
 ## Release Process
 
 1. Update version in both `Cargo.toml` and `pyproject.toml`
-2. Build wheels:
+2. Build wheels. The full matrix is **Python 3.11, 3.12, 3.13 × macOS arm64,
+   manylinux x86_64, manylinux aarch64** — 9 wheels plus an sdist. Build all
+   of them; a partial matrix silently drops platforms that consumers resolve
+   against (sklib pins rupdf and runs on Linux).
    ```bash
-   # macOS
-   maturin build --release -i python3.11 -i python3.12
+   # macOS arm64
+   maturin build --release -i python3.11 -i python3.12 -i python3.13
 
-   # Linux (via Docker)
-   docker run --rm -v "$(pwd)":/io ghcr.io/pyo3/maturin build --release -i python3.12
+   # Linux x86_64 (via Docker)
+   docker run --rm -v "$(pwd)":/io --platform linux/amd64 ghcr.io/pyo3/maturin \
+     build --release -i python3.11 -i python3.12 -i python3.13
+
+   # Linux aarch64 (via Docker)
+   docker run --rm -v "$(pwd)":/io --platform linux/arm64 ghcr.io/pyo3/maturin \
+     build --release -i python3.11 -i python3.12 -i python3.13
+
+   # Source distribution
    docker run --rm -v "$(pwd)":/io ghcr.io/pyo3/maturin sdist
+   ```
+   Confirm you have 10 artifacts before uploading:
+   ```bash
+   ls target/wheels/rupdf-VERSION* | wc -l   # expect 10
    ```
 3. Upload to PyPI:
    ```bash
