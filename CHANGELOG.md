@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] - 2026-11-02
+
+### Fixed
+
+- **Rendering is deterministic.** The same document now renders to
+  byte-identical PDF bytes on every call and in every process, so callers
+  can dedupe or cache PDFs by hashing them. Fonts, images and the
+  opacity graphics states were kept in hash maps whose iteration order is
+  randomized per map, which shuffled object numbers, object order and the
+  order of page resource entries between runs. A text or fill alpha exactly
+  halfway between two of the built-in opacity levels (95, 159 or 223) also
+  snapped to either level at random; it now always takes the lower one.
+  Font subsets are built from glyph ids in ascending order. Content is
+  otherwise unchanged.
+
 ## [0.2.2] - 2026-07-24
 
 ### Added

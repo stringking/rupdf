@@ -2,7 +2,7 @@ use crate::error::{Result, RupdfError};
 use crate::resources::LoadedFont;
 use pdf_writer::types::{CidFontType, FontFlags, SystemInfo, UnicodeCmap};
 use pdf_writer::{Filter, Finish, Name, Pdf, Ref, Str};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Handles font embedding into PDF.
 ///
@@ -13,7 +13,7 @@ pub struct FontEmbedder<'a> {
     font: &'a LoadedFont,
     #[allow(dead_code)]
     font_name: &'a str,
-    used_glyphs: HashSet<u16>,
+    used_glyphs: BTreeSet<u16>,
     char_to_glyph: BTreeMap<char, u16>,
 }
 
@@ -22,7 +22,7 @@ impl<'a> FontEmbedder<'a> {
         Self {
             font,
             font_name,
-            used_glyphs: HashSet::new(),
+            used_glyphs: BTreeSet::new(),
             char_to_glyph: BTreeMap::new(),
         }
     }

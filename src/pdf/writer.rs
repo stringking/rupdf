@@ -4,7 +4,7 @@ use crate::resources::{LoadedFont, LoadedImage, LoadedResources};
 use crate::runs::{self, ResolvedChar};
 use crate::types::*;
 use pdf_writer::{Content, Date, Filter, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// (alias, font) entries describing a primary-plus-fallback font chain.
 /// Tuple values are Copy because they hold borrowed references.
@@ -36,8 +36,8 @@ fn chain_aliases<'a>(chain: &FontChain<'a>) -> Vec<&'a str> {
 fn register_resolved_chars<'a>(
     resolved: &[ResolvedChar],
     chain: &FontChain<'a>,
-    font_embedders: &mut HashMap<String, FontEmbedder<'a>>,
-    alias_to_ps: &mut HashMap<String, String>,
+    font_embedders: &mut BTreeMap<String, FontEmbedder<'a>>,
+    alias_to_ps: &mut BTreeMap<String, String>,
 ) {
     for c in resolved {
         let Some((idx, gid)) = c.glyph else { continue };
@@ -77,13 +77,13 @@ impl<'a> PdfGenerator<'a> {
         let page_tree_ref = ref_alloc.bump();
 
         // First pass: collect all used fonts and images
-        let mut font_embedders: HashMap<String, FontEmbedder> = HashMap::new();
+        let mut font_embedders: BTreeMap<String, FontEmbedder> = BTreeMap::new();
         // Track each unique (image_ref, size) for per-size 300 DPI embedding
         // Key: "imagename_WxH" where W/H are display points rounded to int
         // Value: (original image_ref, width_pts, height_pts)
-        let mut image_usages: HashMap<String, (String, f32, f32)> = HashMap::new();
+        let mut image_usages: BTreeMap<String, (String, f32, f32)> = BTreeMap::new();
         // Map user alias -> PostScript name for font references
-        let mut alias_to_ps: HashMap<String, String> = HashMap::new();
+        let mut alias_to_ps: BTreeMap<String, String> = BTreeMap::new();
 
         for page in &self.doc.pages {
             for element in &page.elements {
@@ -160,8 +160,8 @@ impl<'a> PdfGenerator<'a> {
 
         // Allocate refs for fonts (5 refs each: Type0, CIDFont, Descriptor, CMap, FontFile)
         // Use PostScript names as keys for font_refs (for page resources)
-        let mut font_refs: HashMap<String, Ref> = HashMap::new();
-        let mut font_all_refs: HashMap<String, (Ref, Ref, Ref, Ref, Ref)> = HashMap::new();
+        let mut font_refs: BTreeMap<String, Ref> = BTreeMap::new();
+        let mut font_all_refs: BTreeMap<String, (Ref, Ref, Ref, Ref, Ref)> = BTreeMap::new();
         for font_alias in font_embedders.keys() {
             let ps_name = alias_to_ps.get(font_alias)
                 .expect("font alias was inserted in first pass");
@@ -175,7 +175,7 @@ impl<'a> PdfGenerator<'a> {
         }
 
         // Allocate refs for images (one per unique size)
-        let mut image_refs: HashMap<String, Ref> = HashMap::new();
+        let mut image_refs: BTreeMap<String, Ref> = BTreeMap::new();
         for size_key in image_usages.keys() {
             image_refs.insert(size_key.clone(), ref_alloc.bump());
         }
@@ -189,7 +189,7 @@ impl<'a> PdfGenerator<'a> {
         }
 
         // Allocate refs for alpha graphics states (we'll create a few common ones)
-        let mut alpha_states: HashMap<u8, Ref> = HashMap::new();
+        let mut alpha_states: BTreeMap<u8, Ref> = BTreeMap::new();
         for alpha in [255u8, 191, 127, 63] {
             alpha_states.insert(alpha, ref_alloc.bump());
         }
@@ -317,10 +317,10 @@ impl<'a> PdfGenerator<'a> {
     fn render_page_content(
         &self,
         page: &Page,
-        font_embedders: &HashMap<String, FontEmbedder>,
-        alias_to_ps: &HashMap<String, String>,
-        _image_refs: &HashMap<String, Ref>,
-        alpha_states: &HashMap<u8, Ref>,
+        font_embedders: &BTreeMap<String, FontEmbedder>,
+        alias_to_ps: &BTreeMap<String, String>,
+        _image_refs: &BTreeMap<String, Ref>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) -> Result<Vec<u8>> {
         let mut content = Content::new();
 
@@ -383,7 +383,7 @@ impl<'a> PdfGenerator<'a> {
         }
     }
 
-    fn get_alpha_state_name(&self, alpha: u8, alpha_states: &HashMap<u8, Ref>) -> String {
+    fn get_alpha_state_name(&self, alpha: u8, alpha_states: &BTreeMap<u8, Ref>) -> String {
         // Find closest alpha state
         let closest = alpha_states.keys()
             .min_by_key(|&&a| (a as i16 - alpha as i16).abs())
@@ -397,9 +397,9 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         text: &TextElement,
         page_height: f32,
-        _font_embedders: &HashMap<String, FontEmbedder>,
-        alias_to_ps: &HashMap<String, String>,
-        alpha_states: &HashMap<u8, Ref>,
+        _font_embedders: &BTreeMap<String, FontEmbedder>,
+        alias_to_ps: &BTreeMap<String, String>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) -> Result<()> {
         let chain = build_chain(self.resources, &text.font, &text.font_fallback)?;
         let chain_refs = chain_fonts(&chain);
@@ -474,9 +474,9 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         textbox: &TextBoxElement,
         page_height: f32,
-        _font_embedders: &HashMap<String, FontEmbedder>,
-        alias_to_ps: &HashMap<String, String>,
-        alpha_states: &HashMap<u8, Ref>,
+        _font_embedders: &BTreeMap<String, FontEmbedder>,
+        alias_to_ps: &BTreeMap<String, String>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) -> Result<()> {
         let chain = build_chain(self.resources, &textbox.font, &textbox.font_fallback)?;
         let chain_refs = chain_fonts(&chain);
@@ -608,7 +608,7 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         rect: &RectElement,
         page_height: f32,
-        alpha_states: &HashMap<u8, Ref>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) {
         // Save state to isolate graphics state changes
         content.save_state();
@@ -711,7 +711,7 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         line: &LineElement,
         page_height: f32,
-        alpha_states: &HashMap<u8, Ref>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) {
         // Save state to isolate graphics state changes
         content.save_state();
@@ -797,9 +797,9 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         barcode: &BarcodeElement,
         page_height: f32,
-        font_embedders: &HashMap<String, FontEmbedder>,
-        alias_to_ps: &HashMap<String, String>,
-        _alpha_states: &HashMap<u8, Ref>,
+        font_embedders: &BTreeMap<String, FontEmbedder>,
+        alias_to_ps: &BTreeMap<String, String>,
+        _alpha_states: &BTreeMap<u8, Ref>,
     ) -> Result<()> {
         use crate::types::BarcodeKind;
         use rubar_core::{encode_code128, gs1, Code128Symbol};
@@ -896,7 +896,7 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         qr: &QRCodeElement,
         page_height: f32,
-        alpha_states: &HashMap<u8, Ref>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) -> Result<()> {
         use rubar_core::encode_qr;
 
@@ -924,7 +924,7 @@ impl<'a> PdfGenerator<'a> {
         content: &mut Content,
         dm: &DataMatrixElement,
         page_height: f32,
-        alpha_states: &HashMap<u8, Ref>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) -> Result<()> {
         use rubar_core::{encode_datamatrix, gs1};
 
@@ -978,7 +978,7 @@ impl<'a> PdfGenerator<'a> {
         color: &Color,
         background: &Color,
         page_height: f32,
-        alpha_states: &HashMap<u8, Ref>,
+        alpha_states: &BTreeMap<u8, Ref>,
     ) {
         content.save_state();
 

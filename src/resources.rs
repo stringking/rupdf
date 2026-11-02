@@ -1,6 +1,6 @@
 use crate::error::{Result, RupdfError};
 use crate::types::{FontSource, ImageSource, Resources};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 
 /// Loaded font data with parsed metrics
@@ -213,14 +213,14 @@ impl LoadedImage {
 
 /// All loaded resources for rendering
 pub struct LoadedResources {
-    pub fonts: HashMap<String, LoadedFont>,
-    pub images: HashMap<String, LoadedImage>,
+    pub fonts: BTreeMap<String, LoadedFont>,
+    pub images: BTreeMap<String, LoadedImage>,
 }
 
 impl LoadedResources {
     pub fn load(resources: &Resources) -> Result<Self> {
-        let mut fonts = HashMap::new();
-        let mut images = HashMap::new();
+        let mut fonts = BTreeMap::new();
+        let mut images = BTreeMap::new();
 
         for (name, source) in &resources.fonts {
             fonts.insert(name.clone(), LoadedFont::load(name, source)?);

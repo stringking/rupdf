@@ -2,7 +2,7 @@ use crate::error::{Result, RupdfError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
 use pyo3::Borrowed;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// RGBA color with values 0-255
 #[derive(Debug, Clone, Copy)]
@@ -426,8 +426,8 @@ pub enum ImageSource {
 /// All resources for a document
 #[derive(Debug, Clone, Default)]
 pub struct Resources {
-    pub fonts: HashMap<String, FontSource>,
-    pub images: HashMap<String, ImageSource>,
+    pub fonts: BTreeMap<String, FontSource>,
+    pub images: BTreeMap<String, ImageSource>,
 }
 
 /// Complete document

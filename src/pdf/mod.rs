@@ -196,4 +196,74 @@ mod tests {
 
         assert!(pdf.len() > 200, "Should have background content");
     }
+
+    fn make_text_and_svg_doc() -> Document {
+        let assets = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
+        let asset = |name: &str| assets.join(name).to_str().unwrap().to_string();
+        let text = |y: f32, font: &str, a: u8| {
+            Element::Text(TextElement {
+                x: 72.0,
+                y,
+                text: format!("{} 0123 {{}}", font),
+                font: font.to_string(),
+                font_fallback: vec![],
+                missing_glyph_policy: MissingGlyphPolicy::default(),
+                size: 12.0,
+                color: Color { r: 0, g: 0, b: 0, a },
+                align: TextAlign::default(),
+                vertical_anchor: VerticalAnchor::default(),
+                strikethrough: false,
+            })
+        };
+        let image = |y: f32, image_ref: &str| {
+            Element::Image(ImageElement {
+                x: 0.0,
+                y,
+                w: Some(100.0),
+                h: None,
+                image_ref: image_ref.to_string(),
+                align: TextAlign::default(),
+            })
+        };
+        let mut resources = Resources::default();
+        for (alias, file) in [
+            ("sans", "IBMPlexSans-Regular.otf"),
+            ("sans-bold", "IBMPlexSans-Bold.otf"),
+            ("mono", "IBMPlexMono-Regular.otf"),
+        ] {
+            resources.fonts.insert(alias.to_string(), FontSource::Path(asset(file)));
+        }
+        resources.images.insert("logo".to_string(), ImageSource::Path(asset("test-svg.svg")));
+        resources.images.insert("png".to_string(), ImageSource::Path(asset("test-png.png")));
+        Document {
+            metadata: Metadata::default(),
+            pages: vec![Page {
+                width: 612.0,
+                height: 792.0,
+                background: Color::white(),
+                elements: vec![
+                    text(72.0, "sans", 255),
+                    text(96.0, "sans-bold", 159),
+                    text(120.0, "mono", 100),
+                    image(200.0, "logo"),
+                    image(300.0, "png"),
+                ],
+            }],
+            resources,
+        }
+    }
+
+    #[test]
+    fn test_repeated_renders_are_byte_identical() {
+        for doc in [make_rect_doc(), make_multi_page_doc(), make_text_and_svg_doc()] {
+            let render = || {
+                let resources = LoadedResources::load(&doc.resources).unwrap();
+                PdfGenerator::new(&doc, &resources, true).generate().unwrap()
+            };
+            let first = render();
+            for _ in 0..5 {
+                assert!(render() == first, "render output differs between runs");
+            }
+        }
+    }
 }
