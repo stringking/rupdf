@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## [0.4.3] - 2026-11-02
+
+### Fixed
+
+- **macOS wheels load on macOS 27.** Release builds no longer strip the
+  extension module (`strip = "none"` in `[profile.release]`). With the
+  Xcode 27 toolchain, Cargo's default strip left the symbol string table
+  misaligned, and dyld on macOS 27 refused to load it (`mis-aligned LINKEDIT
+  string pool`). Wheel size is unchanged. The published 0.4.2 macOS wheels
+  were built with stripping disabled through an environment variable, so
+  they are not affected; this makes it the default.
+
 ## [0.4.2] - 2026-11-02
 
 ### Fixed

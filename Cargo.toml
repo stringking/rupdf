@@ -1,6 +1,6 @@
 [package]
 name = "rupdf"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 license = "MIT"
 description = "A fast, minimal PDF page renderer"
@@ -24,6 +24,11 @@ ttf-parser = "0.18"
 subsetter = "0.1"
 rubar-core = "0.3.0"
 thiserror = "1.0"
+
+# Cargo's default release strip leaves __LINKEDIT's string pool misaligned with
+# the Xcode 27 toolchain, and dyld on macOS 27 then refuses to load the module.
+[profile.release]
+strip = "none"
 
 # Note: Criterion benchmarks require Rust 1.74+
 # For older Rust versions, use the Python benchmarks in benchmarks/
